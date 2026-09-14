@@ -14,9 +14,21 @@
 
 ## 环境要求
 
-需要 **Python 3.14 或更高版本**，以及 **pygame-ce**。
+需要 **Python 3.13 或更高版本**。
 
-这里有个坑值得单独说一下：官方 `pygame` 在 PyPI 上最新的 2.6.1 版本**没有提供 Python 3.14 的预编译包**，装它就得在本地从源码编译，在 Windows 上相当折腾。`pygame-ce`（Community Edition）是官方 pygame 的分支，API 完全兼容——你在代码里照样写 `import pygame`——但它跟进新版本 Python 更快，有现成的 3.14 安装包。所以我们用它。
+项目跑在一个专用的 conda 环境里，这样和机器上其他 Python 安装互不干扰：
+
+```bash
+conda create -n touhou python=3.13
+conda activate touhou
+pip install -e ".[dev]"
+```
+
+之所以不直接用 Anaconda 的 base 环境：那里面通常已经有上千个由 conda 管理的包，往里面混装 pip 包是 conda 环境损坏的常见原因。独立环境更干净。
+
+**调用解释器时请写清楚是哪一个。** 一台机器上往往装着好几个 Python，PATH 的先后决定了 `python` 这个名字最终指向谁——很容易落到某个没装依赖的解释器上，然后收到一个莫名其妙的 `ModuleNotFoundError`。要么先 `conda activate touhou`，要么直接写解释器的绝对路径。
+
+关于 **pygame-ce**：它是官方 `pygame` 的社区分支，API 完全兼容——你在代码里照样写 `import pygame`。我们选它是因为它维护更活跃、发布节奏更快、而且是官方的超集。需要说明的是这**不是硬性要求**：官方 `pygame` 在 Python 3.13 上同样有现成的安装包，想换回去把依赖名改掉即可。
 
 ```bash
 pip install pygame-ce
@@ -28,7 +40,7 @@ pip install pygame-ce
 
 ```bash
 pip install -r requirements.txt    # 安装依赖
-python -m touhou                    # 从 src 目录启动游戏
+python -m touhou                    # 启动游戏（先在 conda 环境 touhou 里）
 pytest                              # 跑测试
 python dist/build.py                # 打包成 exe（会调用 pyinstaller）
 ```
