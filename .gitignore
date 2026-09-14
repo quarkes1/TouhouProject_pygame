@@ -1,0 +1,26 @@
+# 设计文档与实现计划只作本地工作文件，不进仓库
+/docs
+/.superpowers
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 打包
+build/
+# dist/ 下的 build.py 与 touhou.spec 是要提交的，只忽略产物
+dist/*.exe
+dist/*.spec
+
+# 工具缓存
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# 虚拟环境
+.venv/
+venv/
+
+# 杂项
+*.log
