@@ -5,8 +5,7 @@
 
     pxPerFrame = pxPerSecond / 60
 
-数值来源与取舍见 docs/superpowers/specs/2026-09-14-touhou-pygame-replica-design.md
-§6.1。这些是起点值，需要实测调整。
+数值来源与取舍见 docs/DESIGN.md「数值常量与单位」。这些是起点值，需要实测调整。
 """
 
 # —— 分辨率与布局 ——

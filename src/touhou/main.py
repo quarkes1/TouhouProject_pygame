@@ -29,6 +29,10 @@ class Game:
     def __init__(self) -> None:
         pygame.init()
 
+        # Info() 必须在 set_mode 之前取：实测 set_mode(640, 480) 之后
+        # Info() 报告的是窗口尺寸（640×480）而不是显示器尺寸，倍率会被
+        # 静默钉死成 ×1。这条调用顺序是「倍率反映真实显示器」的前提，
+        # 任何把 set_mode 提前的重构都会让每次启动都变成 ×1 小窗。
         info = pygame.display.Info()
         self.scaleFactor = chooseScaleFactor(
             info.current_w, info.current_h, constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT

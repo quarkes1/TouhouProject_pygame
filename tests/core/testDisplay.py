@@ -1,7 +1,7 @@
 """窗口缩放倍率选择。
 
 逻辑分辨率固定 640×480，整数倍缩放到窗口。非整数倍会让像素变成大小
-不一的矩形、画面发糊，所以宁可留黑边。详见设计文档 §5.4。
+不一的矩形、画面发糊，所以宁可留黑边。详见 docs/DESIGN.md「渲染」。
 """
 
 from touhou.core.display import chooseScaleFactor, scaledSize

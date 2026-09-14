@@ -1,5 +1,7 @@
 # 设计文档与实现计划只作本地工作文件，不进仓库
-/docs
+# docs/ 下只有 DESIGN.md 进仓库，其余（specs/、plans/）是本地的
+/docs/*
+!/docs/DESIGN.md
 /.superpowers
 
 # Python

@@ -42,9 +42,7 @@ def testPlayerAdvancesByNormalSpeedPerStep(game, monkeypatch):
     for _ in range(steps):
         game.update()
 
-    assert game.player.position.x == pytest.approx(
-        startX + steps * constants.PLAYER_SPEED_NORMAL
-    )
+    assert game.player.position.x == pytest.approx(startX + steps * constants.PLAYER_SPEED_NORMAL)
 
 
 def testSlowModeUsesSlowSpeed(game, monkeypatch):

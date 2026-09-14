@@ -27,7 +27,7 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 # 本项目函数/方法/变量用 lowerCamelCase，与 PEP 8 的 snake_case 建议冲突。
-# 这不是疏漏，是有意选择，见设计文档 §8.1。
+# 这不是疏漏，是有意选择，见 docs/DESIGN.md「代码约定」。
 # N999 是同一个冲突在模块层面的表现：文件按其主类命名（spriteSheet.py、
 # gameLoop.py），自然不是 snake_case，因此与上面三条一并豁免。
 ignore = ["N802", "N803", "N815", "N999"]
