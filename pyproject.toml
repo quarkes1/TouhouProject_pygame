@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "touhou"
 version = "0.1.0"
 description = "用 pygame 做的东方 Project 同人弹幕游戏"
-requires-python = ">=3.14"
+requires-python = ">=3.13"
 dependencies = ["pygame-ce>=2.5.8"]
 
 [project.optional-dependencies]

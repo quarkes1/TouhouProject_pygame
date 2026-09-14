@@ -9,9 +9,10 @@ __pycache__/
 
 # 打包
 build/
-# dist/ 下的 build.py 与 touhou.spec 是要提交的，只忽略产物
+# dist/ 下的 build.py 与 touhou.spec 是要提交的源码，只忽略打包产物。
+# 不要写 dist/*.spec —— 那条规则会连 touhou.spec 一起忽略掉，
+# 导致 Plan D 里 git add dist/touhou.spec 静默失败（不报错，但文件没被跟踪）。
 dist/*.exe
-dist/*.spec
 
 # 工具缓存
 .mypy_cache/
