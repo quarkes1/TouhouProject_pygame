@@ -22,8 +22,11 @@ def isFrozen() -> bool:
 def projectRoot() -> Path:
     """项目根目录。打包后是临时解压目录。"""
     if isFrozen():
-        # _MEIPASS 由 pyinstaller 注入，类型检查器不知道它存在
-        return Path(getattr(sys, "_MEIPASS"))
+        # _MEIPASS 由 pyinstaller 在运行时注入，类型检查器不知道它存在，
+        # 所以必须用 getattr 取——直接写 sys._MEIPASS 会让 mypy strict 报
+        # attr-defined。而 getattr 传字面量属性名又会被 ruff 的 B009 拦下，
+        # 两个工具的要求正好相反，因此这里必须显式豁免 B009。
+        return Path(getattr(sys, "_MEIPASS"))  # noqa: B009
     return Path(__file__).resolve().parents[3]
 
 
