@@ -4,6 +4,7 @@ core/ 是「任何弹幕射击游戏都能用」的部分，game/ 才知道自�
 这条边界是 core/ 能脱离 pygame 窗口被独立测试的前提。
 详见设计文档 §4.1。
 """
+
 import ast
 from pathlib import Path
 

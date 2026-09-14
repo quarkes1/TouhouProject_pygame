@@ -2,6 +2,7 @@
 
 不测具体数值（那些是要调的），只测它们之间的关系是否成立。
 """
+
 from touhou import constants
 
 

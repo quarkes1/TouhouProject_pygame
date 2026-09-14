@@ -7,6 +7,7 @@ pyinstaller 打包后 __file__ 指向临时解压目录，路径结构完全不�
 改用 sys._MEIPASS。两种环境必须分开处理，否则打包出来的游戏一启动
 就找不到素材。
 """
+
 import sys
 from pathlib import Path
 

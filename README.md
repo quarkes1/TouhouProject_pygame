@@ -121,8 +121,8 @@ class SpriteSheet:
         self.frameWidth = frameWidth
         self.rotatedCache: dict[int, list] = {}
 
-    def getRotated(self, angleDeg: int):
-        ...
+    def getRotated(self, angleDeg: int): ...
+
 
 FPS = 60
 ```

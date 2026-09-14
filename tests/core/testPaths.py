@@ -3,6 +3,7 @@
 开发环境下资源在项目根的 assets/ 下；pyinstaller 打包后 __file__ 指向
 临时解压目录，两者结构完全不同，必须分开处理。
 """
+
 import sys
 from pathlib import Path
 
