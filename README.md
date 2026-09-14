@@ -24,6 +24,8 @@ conda activate touhou
 pip install -e ".[dev]"
 ```
 
+（若 `conda activate` 报 `Run 'conda init' before 'conda activate'`，先跑一次 `conda init cmd.exe` 并重开终端。环境已经建好的话，直接用绝对路径 `D:\Anaconda3\envs\touhou\python.exe` 也能做同样的事。）
+
 之所以不直接用 Anaconda 的 base 环境：那里面通常已经有上千个由 conda 管理的包，往里面混装 pip 包是 conda 环境损坏的常见原因。独立环境更干净。
 
 **调用解释器时请写清楚是哪一个。** 一台机器上往往装着好几个 Python，PATH 的先后决定了 `python` 这个名字最终指向谁——很容易落到某个没装依赖的解释器上，然后收到一个莫名其妙的 `ModuleNotFoundError`。要么先 `conda activate touhou`，要么直接写解释器的绝对路径。
@@ -38,12 +40,33 @@ pip install pygame-ce
 
 ## 快速开始
 
-```bash
-pip install -r requirements.txt    # 安装依赖
-python -m touhou                    # 启动游戏（先在 conda 环境 touhou 里）
-pytest                              # 跑测试
-python dist/build.py                # 打包成 exe（会调用 pyinstaller）
+**最省事的跑法：直接写解释器的绝对路径，不需要任何额外设置。**
+
+```bat
+D:\Anaconda3\envs\touhou\python.exe -m touhou
 ```
+
+想用短一点的命令，可以先把环境激活（见下方「两个常见报错」）：
+
+```bat
+conda activate touhou
+python -m touhou
+```
+
+其余命令一律用同一个解释器：
+
+```bat
+D:\Anaconda3\envs\touhou\python.exe -m pytest          :: 跑测试
+D:\Anaconda3\envs\touhou\python.exe dist\build.py      :: 打包成 exe（调用 pyinstaller）
+```
+
+### 两个常见报错
+
+**`CondaError: Run 'conda init' before 'conda activate'`**
+conda 还没对当前终端做过初始化。跑一次 `conda init cmd.exe`（或把 `cmd.exe` 换成你用的 shell），**然后重开终端**。不想动配置就一直用上面的绝对路径，效果一样。
+
+**`No module named touhou`**
+说明 `python` 这个名字指向了别的解释器。这台机器上装了多个 Python，PATH 的先后决定了 `python` 指向谁——实际会落到 MSYS2 工具链自带的那个，它里面没有本项目的依赖。这就是为什么上面所有命令都写成绝对路径。
 
 游戏的操作方式沿用原作：
 
