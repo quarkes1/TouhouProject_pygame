@@ -142,3 +142,47 @@ def testAnimationFrameStaysInRange(player):
     for _ in range(600):
         player.update(FrameInput())
         assert 0 <= player.animationFrame < player.spriteSheet.frameCount
+
+
+# —— 立绘帧 ——
+
+
+@pytest.fixture
+def tiltPlayer() -> Player:
+    """帧上带标记块的玩家。全透明帧旋转后还是全透明，三种朝向会字节级
+    相同，任何断言都测不出倾斜——所以必须放可见像素。"""
+    surface = pygame.Surface((25, 50), pygame.SRCALPHA)
+    surface.fill((0, 255, 0, 255), pygame.Rect(10, 0, 4, 4))  # 顶部中央的标记块
+    return Player(position=Vector2(200, 300), spriteSheet=SpriteSheet(surface, 25, 50))
+
+
+def testCurrentFramePicksBranchByFacing(tiltPlayer):
+    """朝向 0 用平帧，+1 用 +7°（右倾），-1 用 -7°（左倾）。
+
+    currentFrame 的倾斜角度符号写反的话（+7/-7 互换），立绘会朝反方向倾，
+    但三种朝向的帧都会正常生成、照常缓存——这个文件里的移动与朝向测试
+    全部只看 facing 数字，没有一个会红。这里直接断言「朝向和角度的对应
+    关系」，与 testSpriteSheet 里「+7° = 顺时针右倾」的方向锁合起来，
+    整个倾斜方向才被钉死。
+    """
+    tiltPlayer.facing = 0
+    upright = tiltPlayer.currentFrame()
+    assert pygame.image.tobytes(upright, "RGBA") == pygame.image.tobytes(
+        tiltPlayer.spriteSheet.getFrame(tiltPlayer.animationFrame), "RGBA"
+    )
+
+    tiltPlayer.facing = 1
+    right = tiltPlayer.currentFrame()
+    assert pygame.image.tobytes(right, "RGBA") == pygame.image.tobytes(
+        tiltPlayer.spriteSheet.getRotated(tiltPlayer.animationFrame, 7), "RGBA"
+    )
+
+    tiltPlayer.facing = -1
+    left = tiltPlayer.currentFrame()
+    assert pygame.image.tobytes(left, "RGBA") == pygame.image.tobytes(
+        tiltPlayer.spriteSheet.getRotated(tiltPlayer.animationFrame, -7), "RGBA"
+    )
+
+    # 三种朝向两两不同：倾斜确实改变了画面，且左右倾斜互为镜像而非相同
+    for one, other in ((right, left), (right, upright), (left, upright)):
+        assert pygame.image.tobytes(one, "RGBA") != pygame.image.tobytes(other, "RGBA")

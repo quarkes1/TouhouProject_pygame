@@ -109,3 +109,38 @@ def testGetRotatedPreservesApparentSize(sheet):
     rotated = sheet.getRotated(0, 45)
     assert rotated.get_width() >= 24
     assert rotated.get_height() >= 19
+
+
+def testGetRotatedFollowsClockwiseAngleConvention():
+    """角度约定的方向锁：0° 正上、顺时针增大，标记块落在 上/右/下/左。
+
+    在透明帧顶部中央放一个标记块，0/90/180/270° 旋转后标记必须依次落在
+    上/右/下/左。Plan B 的自机狙、扇形、环形弹幕全部渲染自这个函数，
+    内部旋转方向的负号一旦被去掉，所有定向图案会整体左右镜像——而纯缓存
+    测试（只查键、不查像素）对此毫无反应。
+
+    旋转后的外接矩形会变大，所以一律以返回图自己的中心为基准判断。
+    """
+    frame = pygame.Surface((16, 16), pygame.SRCALPHA)
+    marker = (255, 0, 0, 255)
+    frame.fill(marker, pygame.Rect(6, 0, 4, 4))  # 顶部中央的标记块
+    markedSheet = SpriteSheet(frame, 16, 16)
+
+    def markerPixels(surface: pygame.Surface) -> list[tuple[int, int]]:
+        return [
+            (x, y)
+            for y in range(surface.get_height())
+            for x in range(surface.get_width())
+            if surface.get_at((x, y)) == marker
+        ]
+
+    # 方向 (dx, dy)：0° 上、90° 右、180° 下、270° 左
+    for angle, (dx, dy) in ((0, (0, -1)), (90, (1, 0)), (180, (0, 1)), (270, (-1, 0))):
+        rotated = markedSheet.getRotated(0, angle)
+        centre = (rotated.get_width() // 2, rotated.get_height() // 2)
+        pixels = markerPixels(rotated)
+        assert pixels, f"{angle}° 旋转后找不到标记块"
+        for x, y in pixels:
+            # 四个角度恰好都是纯轴向，只检查该轴即可，另一个轴要求会误伤
+            axisDelta = x - centre[0] if dx else y - centre[1]
+            assert axisDelta * (dx or dy) > 0, f"{angle}° 时标记块不在预期一侧（{(dx, dy)}）"

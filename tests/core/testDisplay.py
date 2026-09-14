@@ -34,6 +34,20 @@ def testNeverReturnsZero():
         assert chooseScaleFactor(width, width, 640, 480) >= 1
 
 
+def testWidthAxisCanBindBelowHeight():
+    """宽度必须参与比较：宽只够 2 倍而高够 4 倍时，结果是 2 而不是 4。
+
+    只按高度取的话窗口宽度会超出屏幕。既有用例两个轴同量级或高度更紧，
+    宽度单独收紧的分支此前没有任何测试锁住。
+    """
+    assert chooseScaleFactor(1280, 2000, 640, 480) == 2
+
+
+def testWidthAxisCanClampToOne():
+    """宽只够 1 倍而高够 3 倍时，宽度把倍率压回下限 1。"""
+    assert chooseScaleFactor(700, 1440, 640, 480) == 1
+
+
 def testScaledSizeMultipliesBothAxes():
     assert scaledSize(640, 480, 2) == (1280, 960)
 
