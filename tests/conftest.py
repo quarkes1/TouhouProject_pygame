@@ -16,5 +16,10 @@ import pytest
 @pytest.fixture(scope="session", autouse=True)
 def initPygame():
     pygame.init()
+    # 必须建一个显示表面。Surface.convert_alpha() 需要一个已设定的像素格式，
+    # 否则抛 "No convert format has been set, try display.set_mode()"。
+    # 尺寸 1×1 就够——它的作用只是提供格式信息，没有测试会去读它的尺寸；
+    # 真正的窗口尺寸由 main.py 自己 set_mode。
+    pygame.display.set_mode((1, 1))
     yield
     pygame.quit()
