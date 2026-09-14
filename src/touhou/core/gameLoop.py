@@ -45,6 +45,13 @@ class FixedStepAccumulator:
         表现为慢动作。丢弃积压等于承认「这段时间追不回来了」，
         宁可让游戏变慢也不能让它卡死。
         """
+        # 负数时间视为 0。int() 是向零截断的，不守卫的话 advance(STEP * -2.5)
+        # 会返回 -2 步，并把 pendingSeconds 变成一笔负数欠账，害得后面几帧少跑。
+        # 正常调用传不进负数，但这个类存在的前提就是「计时不可靠时也不能出错」，
+        # 所以这是补全契约，不是防御性编程。
+        if realDeltaSeconds <= 0:
+            return 0
+
         self.pendingSeconds += realDeltaSeconds
         steps = int(self.pendingSeconds / self.stepSeconds)
 
@@ -57,5 +64,9 @@ class FixedStepAccumulator:
         return steps
 
     def reset(self) -> None:
-        """清空积压（暂停恢复、场景切换时用）。"""
+        """清空积压（暂停恢复、场景切换时用）。
+
+        只清 pendingSeconds。droppedSeconds 是累计诊断计数，不清——
+        它记录的是「这局一共丢了多少时间」，重置它会抹掉有用的事实。
+        """
         self.pendingSeconds = 0.0

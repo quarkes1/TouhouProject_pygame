@@ -78,3 +78,22 @@ def testRepeatedExactStepsDoNotDrift(accumulator):
     """连续 60 次精确的一帧，应该正好跑满 60 步，不能因浮点误差少跑。"""
     total = sum(accumulator.advance(STEP) for _ in range(60))
     assert total == 60
+
+
+def testNegativeDeltaIsIgnored(accumulator):
+    """负数时间视为 0。
+
+    int() 向零截断，不守卫的话 advance(STEP * -2.5) 会返回 -2 步，并把
+    pendingSeconds 变成一笔负数欠账，害得后面几帧少跑。正常调用传不进负数，
+    但这个类存在的前提就是「计时不可靠时也不能出错」。
+
+    最后一条断言是关键：它验证了负数没有留下欠账。
+    """
+    assert accumulator.advance(STEP * -2.5) == 0
+    assert accumulator.pendingSeconds == 0.0
+    assert accumulator.advance(STEP) == 1
+
+
+def testZeroDeltaIsIgnored(accumulator):
+    assert accumulator.advance(0.0) == 0
+    assert accumulator.pendingSeconds == 0.0
