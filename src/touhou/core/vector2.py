@@ -85,7 +85,12 @@ class Vector2:
         return Vector2(self.x * cosA - self.y * sinA, self.x * sinA + self.y * cosA)
 
     def angleDeg(self) -> float:
-        """返回本向量对应的角度，范围 [0, 360)。与 fromDeg 互为逆运算。"""
+        """返回本向量对应的角度，范围 [0, 360)。与 fromDeg 互为逆运算。
+
+        零向量返回 180.0（atan2(0.0, -0.0) 是 π），而不是报错或 0。零向量
+        本没有角度可言，现在没有调用方，真正的契约留给 Plan B 的定向弹幕
+        定——届时若要改语义，从这里开始。
+        """
         return math.degrees(math.atan2(self.x, -self.y)) % 360
 
     def toTuple(self) -> tuple[float, float]:

@@ -70,6 +70,23 @@ def testFromFileLoadsRealAsset():
     assert real.getFrame(0).get_width() == 24
 
 
+def testRejectsSurfaceSmallerThanOneFrame():
+    """表面小到连一帧都切不出时必须立刻报错。
+
+    不守卫的话 frameCount 会是 0，然后 player.py 的 advanceAnimation 里
+    % frameCount 抛 ZeroDivisionError、getFrame 抛 IndexError——都远离
+    真正的错误现场。Plan B 的加载器从 JSON 读帧尺寸，在构造时拦住比在
+    动画循环里炸掉好查得多。
+    """
+    with pytest.raises(ValueError):
+        SpriteSheet(pygame.Surface((10, 100), pygame.SRCALPHA), 24, 19)
+
+
+def testRejectsNonPositiveFrameSize():
+    with pytest.raises(ValueError):
+        SpriteSheet(pygame.Surface((24, 19), pygame.SRCALPHA), 0, 19)
+
+
 # —— 旋转缓存（性能关键路径）——
 
 

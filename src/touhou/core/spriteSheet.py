@@ -22,6 +22,11 @@ class SpriteSheet:
     def __init__(self, surface: pygame.Surface, frameWidth: int, frameHeight: int) -> None:
         if frameWidth <= 0 or frameHeight <= 0:
             raise ValueError(f"帧尺寸必须为正数，收到 {frameWidth}x{frameHeight}")
+        if surface.get_width() < frameWidth or surface.get_height() < frameHeight:
+            raise ValueError(
+                f"表面 {surface.get_width()}x{surface.get_height()} 小于一帧 "
+                f"{frameWidth}x{frameHeight}，切不出任何帧"
+            )
 
         self.frameWidth = frameWidth
         self.frameHeight = frameHeight
@@ -55,7 +60,9 @@ class SpriteSheet:
         """取旋转到指定角度的帧，结果被缓存。
 
         角度按本项目的全局约定解释（0° 正上、顺时针增大），归一到
-        [0, 360) 的整数度后作为缓存键，因此缓存最多 360 项。
+        [0, 360) 的整数度后作为缓存键，因此缓存键最多 360 × 帧数 个——
+        吃满约 1.5 MB（4 帧 16×16 子弹表）到 14 MB（自机立绘），量级与
+        取舍见 docs/DESIGN.md「性能」。
 
         pygame.transform.rotate 的度数是逆时针为正，而屏幕 y 轴向下，
         所以要取负号才能得到「顺时针增大」的视觉效果。

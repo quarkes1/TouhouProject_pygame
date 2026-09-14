@@ -26,6 +26,11 @@ def clampToPlayfield(position: Vector2, halfSize: Vector2) -> Vector2:
 
     halfSize 是立绘半宽半高——用立绘尺寸而非判定点做约束，因为玩家看到的
     是立绘，立绘探出边界会显得很怪，哪怕判定点还在场内。
+
+    倾斜 ±7° 后立绘外接矩形从 25×50 涨到约 30×52，贴边时外接矩形会探出
+    游戏区约 2.5px。实测（marisa_forward.png 第 0 帧，±7°，四边贴齐）探出
+    的部分全部是透明像素，可见像素全部在游戏区内，所以钳制沿用平帧
+    halfSize 即可，不必加宽——加宽只会让自机在离边更远处提前停下。
     """
     minX = constants.PLAYFIELD_X + halfSize.x
     maxX = constants.PLAYFIELD_X + constants.PLAYFIELD_WIDTH - halfSize.x
@@ -63,6 +68,12 @@ class Player:
         self.advanceAnimation()
 
     def move(self, direction: Vector2) -> None:
+        """按当前速度档位移动一步，并钳制在游戏区内。
+
+        速度档位来自 self.slow，而它只在 update() 里由 FrameInput 写入；
+        绕过 update() 直接调 move() 会沿用上一帧的档位（初始为全速）。
+        这是有意为之：move 是 update 的内部步骤，不是公共入口。
+        """
         speed = self.speedSlow if self.slow else self.speedNormal
         self.position = clampToPlayfield(self.position + direction * speed, self.halfSize())
 

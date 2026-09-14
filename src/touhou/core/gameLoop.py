@@ -41,6 +41,7 @@ class FixedStepAccumulator:
         """累加真实经过时间，返回本次应执行的逻辑步数。
 
         超过 maxStepsPerFrame 的积压会被整段丢弃并计入 droppedSeconds。
+        不足一步的余数同样被丢弃，但 droppedSeconds 只按整步计。
         保留积压的话，接下来每一帧都会再次触顶，游戏会长时间处于追赶状态，
         表现为慢动作。丢弃积压等于承认「这段时间追不回来了」，
         宁可让游戏变慢也不能让它卡死。
