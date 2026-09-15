@@ -38,27 +38,6 @@ pip install pygame-ce
 
 除此之外只依赖标准库。**我们没有引入 numpy**，原因见下面「为什么不用 numpy」一节。
 
-## 快速开始
-
-**最省事的跑法：直接写解释器的绝对路径，不需要任何额外设置。**
-
-```bat
-D:\Anaconda3\envs\touhou\python.exe -m touhou
-```
-
-想用短一点的命令，可以先把环境激活（见下方「两个常见报错」）：
-
-```bat
-conda activate touhou
-python -m touhou
-```
-
-其余命令一律用同一个解释器：
-
-```bat
-D:\Anaconda3\envs\touhou\python.exe -m pytest          :: 跑测试
-D:\Anaconda3\envs\touhou\python.exe dist\build.py      :: 打包成 exe（调用 pyinstaller）
-```
 
 ### 两个常见报错
 
