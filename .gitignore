@@ -3,6 +3,7 @@
 /docs/*
 !/docs/DESIGN.md
 /.superpowers
+/.worktrees/
 
 # Python
 __pycache__/
