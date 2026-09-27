@@ -8,14 +8,18 @@
 from __future__ import annotations
 
 import random
+from enum import Enum, auto
+from pathlib import Path
 
 import pygame
 
 from touhou import constants
+from touhou.core.audio import AudioManager
 from touhou.core.display import chooseScaleFactor, scaledSize
 from touhou.core.gameLoop import FixedStepAccumulator
 from touhou.core.input import PressLatch, readKeyboardInput
 from touhou.core.paths import assetPath
+from touhou.core.settings import loadSettings, saveSettings
 from touhou.core.spriteSheet import SpriteSheet
 from touhou.core.vector2 import Vector2
 from touhou.game import collision
@@ -28,6 +32,7 @@ from touhou.game.entities.effect import bakeExpandingRing
 from touhou.game.entities.player import Player
 from touhou.game.levelData import loadLevel
 from touhou.ui import bossBar, hud
+from touhou.ui import menu as menuUi
 
 BACKGROUND_PATH_PARTS = ("sprites", "backgrounds", "background.png")
 PLAYER_SPRITE_PATH_PARTS = ("sprites", "entities", "marisa_forward.png")
@@ -39,6 +44,7 @@ PLAYER_HITBOX_PATH_PARTS = ("sprites", "effects", "player_hitbox.png")
 DEATH_EFFECT_PATH_PARTS = ("sprites", "effects", "player_death_effect.png")
 BACKGROUND_SCROLL_SPEED = 0.5  # 像素/帧，向下滚动
 LEVEL_PATH_PARTS = ("levels", "level_1.json")
+TITLE_BACKGROUND_PATH_PARTS = ("sprites", "backgrounds", "title_screen_wallpaper.jpg")
 
 # 随机弹幕的种子。**写死而不是取时间**：同一份输入必须产生同一场战斗，
 # 否则录像回放与逐帧调试都无从谈起（docs/DESIGN.md「主循环」）。
@@ -46,21 +52,70 @@ LEVEL_PATH_PARTS = ("levels", "level_1.json")
 RANDOM_SEED = 20260927
 
 
+class Scene(Enum):
+    TITLE = auto()
+    OPTIONS = auto()
+    PLAYING = auto()
+    PAUSED = auto()
+    GAME_OVER = auto()
+    STAGE_CLEAR = auto()
+
+
+def canvasDestination(windowSize: tuple[int, int]) -> pygame.Rect:
+    """计算保持 4:3、居中且不裁切的画布目标矩形。"""
+    windowWidth, windowHeight = windowSize
+    logicalWidth = constants.LOGICAL_WIDTH
+    logicalHeight = constants.LOGICAL_HEIGHT
+    if windowWidth >= logicalWidth and windowHeight >= logicalHeight:
+        integerFactor = max(1, min(windowWidth // logicalWidth, windowHeight // logicalHeight))
+        width = logicalWidth * integerFactor
+        height = logicalHeight * integerFactor
+    else:
+        shrinkFactor = min(windowWidth / logicalWidth, windowHeight / logicalHeight)
+        width = max(1, int(logicalWidth * shrinkFactor))
+        height = max(1, int(logicalHeight * shrinkFactor))
+    return pygame.Rect((windowWidth - width) // 2, (windowHeight - height) // 2, width, height)
+
+
+def presentCanvas(
+    window: pygame.Surface, canvas: pygame.Surface, windowSize: tuple[int, int]
+) -> None:
+    """把固定逻辑画布缩放到可变窗口中央，并用黑色填满边带。"""
+    destination = canvasDestination(windowSize)
+    window.fill((0, 0, 0))
+    if destination.size == canvas.get_size():
+        window.blit(canvas, destination)
+    elif destination.width < canvas.get_width():
+        window.blit(pygame.transform.smoothscale(canvas, destination.size), destination)
+    else:
+        window.blit(pygame.transform.scale(canvas, destination.size), destination)
+    pygame.display.flip()
+
+
 class Game:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        window: pygame.Surface | None = None,
+        canvas: pygame.Surface | None = None,
+    ) -> None:
         pygame.init()
 
         # Info() 必须在 set_mode 之前取：实测 set_mode(640, 480) 之后
         # Info() 报告的是窗口尺寸（640×480）而不是显示器尺寸，倍率会被
         # 静默钉死成 ×1。这条调用顺序是「倍率反映真实显示器」的前提，
         # 任何把 set_mode 提前的重构都会让每次启动都变成 ×1 小窗。
-        info = pygame.display.Info()
-        self.scaleFactor = chooseScaleFactor(
-            info.current_w, info.current_h, constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT
-        )
-        windowSize = scaledSize(constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, self.scaleFactor)
-
-        self.window = pygame.display.set_mode(windowSize)
+        if window is None:
+            info = pygame.display.Info()
+            self.scaleFactor = chooseScaleFactor(
+                info.current_w, info.current_h, constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT
+            )
+            windowSize = scaledSize(
+                constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, self.scaleFactor
+            )
+            self.window = pygame.display.set_mode(windowSize, pygame.RESIZABLE)
+        else:
+            self.window = window
+            self.scaleFactor = 1
         pygame.display.set_caption("TouhouProject")
 
         # 关掉 SDL 的文本输入通道。**必须在 set_mode 之后调用。**
@@ -75,7 +130,9 @@ class Game:
         pygame.key.stop_text_input()
 
         # 所有绘制先落在这张 640×480 的画布上，最后一次性整数倍缩放
-        self.canvas = pygame.Surface((constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)).convert()
+        self.canvas = canvas or pygame.Surface(
+            (constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)
+        ).convert()
 
         self.background = self.loadBackground()
         self.backgroundOffset = 0.0
@@ -246,15 +303,15 @@ class Game:
             return
         self.effects.spawn(self.ringFrames, bossBefore.position, self.ringFramesPerFrame)
 
-    def render(self) -> None:
+    def render(self, present: bool = True) -> None:
         self.drawPlayfield()
         # 血条排在游戏区之后（不然会被子弹盖住）、HUD 之前（它只占游戏区那 384px，
         # 与右侧面板不重叠）。BOSS 不在场时它自己什么都不画。
         self.drawBossBar()
         # HUD 只收裸值，不认自机对象——它因此可以脱离游戏逻辑单独测试。
         hud.drawHud(self.canvas, self.player.lives, self.player.bombs, self.player.power)
-        self.blitToWindow()
-        pygame.display.flip()
+        if present:
+            self.blitToWindow()
 
     def drawPlayfield(self) -> None:
         """画游戏区。绘制被裁剪在游戏区矩形内。"""
@@ -326,24 +383,199 @@ class Game:
         )
 
     def blitToWindow(self) -> None:
-        if self.scaleFactor == 1:
-            self.window.blit(self.canvas, (0, 0))
-            return
-        pygame.transform.scale(
-            self.canvas,
-            scaledSize(constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, self.scaleFactor),
-            self.window,
+        presentCanvas(self.window, self.canvas, self.window.get_size())
+
+
+class Application:
+    """窗口、场景、设置和单局游戏会话的拥有者。"""
+
+    def __init__(self, settingsPathOverride: Path | None = None) -> None:
+        pygame.init()
+        info = pygame.display.Info()
+        scaleFactor = chooseScaleFactor(
+            info.current_w, info.current_h, constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT
         )
+        self.windowSize = scaledSize(
+            constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, scaleFactor
+        )
+        self.settingsPathOverride = settingsPathOverride
+        self.settings = loadSettings(settingsPathOverride)
+        self.window = self._createWindow()
+        pygame.display.set_caption("TouhouProject")
+        pygame.key.stop_text_input()
+        self.canvas = pygame.Surface(
+            (constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)
+        ).convert()
+        self.titleBackground = pygame.image.load(
+            str(assetPath(*TITLE_BACKGROUND_PATH_PARTS))
+        ).convert()
+        self.audio = AudioManager(self.settings)
+        self.audio.playMusic("title")
+        self.scene = Scene.TITLE
+        self.running = True
+        self.clock = pygame.time.Clock()
+        self.game: Game | None = None
+        self.titleMenu = menuUi.Menu(
+            (
+                menuUi.MenuItem("开始游戏", "start"),
+                menuUi.MenuItem("设置", "options"),
+                menuUi.MenuItem("退出", "quit"),
+            )
+        )
+        self.optionsMenu = menuUi.OptionsMenu(self.settings)
+        self.pauseMenu = menuUi.Menu(
+            (
+                menuUi.MenuItem("继续", "continue"),
+                menuUi.MenuItem("重新开始", "restart"),
+                menuUi.MenuItem("返回标题", "title"),
+                menuUi.MenuItem("退出", "quit"),
+            )
+        )
+
+    def _createWindow(self) -> pygame.Surface:
+        if self.settings.fullscreen:
+            window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+            self.windowSize = window.get_size()
+            return window
+        return pygame.display.set_mode(self.windowSize, pygame.RESIZABLE)
+
+    def run(self) -> None:
+        while self.running:
+            realDeltaSeconds = self.clock.tick(constants.FPS) / 1000.0
+            self.handleEvents()
+            if self.scene is Scene.PLAYING and self.game is not None:
+                for _ in range(self.game.accumulator.advance(realDeltaSeconds)):
+                    self.update()
+            self.render()
+
+    def startGame(self) -> None:
+        self.game = Game(self.window, self.canvas)
+        self.scene = Scene.PLAYING
+        self._resetSessionInput()
+        self.audio.playMusic("stage")
+
+    def restartGame(self) -> None:
+        self.startGame()
+
+    def returnToTitle(self) -> None:
+        if self.game is not None:
+            self._resetSessionInput()
+        self.game = None
+        self.scene = Scene.TITLE
+        self.audio.playMusic("title")
+
+    def _resetSessionInput(self) -> None:
+        if self.game is None:
+            return
+        self.game.accumulator.reset()
+        self.game.pressLatch.pending = 0
+
+    def handleEvents(self) -> None:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+                continue
+            if event.type == pygame.VIDEORESIZE and not self.settings.fullscreen:
+                self.windowSize = (max(1, event.w), max(1, event.h))
+                self.window = pygame.display.set_mode(self.windowSize, pygame.RESIZABLE)
+                if self.game is not None:
+                    self.game.window = self.window
+                continue
+            if event.type != pygame.KEYDOWN:
+                continue
+            self._handleKey(event.key)
+
+    def _handleKey(self, key: int) -> None:
+        if self.scene is Scene.TITLE:
+            self._handleTitleKey(key)
+        elif self.scene is Scene.OPTIONS:
+            self._handleOptionsKey(key)
+        elif self.scene is Scene.PLAYING:
+            if key == pygame.K_ESCAPE:
+                self.scene = Scene.PAUSED
+                self._resetSessionInput()
+                self.audio.playSound("cancel")
+            elif key == pygame.K_x and self.game is not None:
+                self.game.pressLatch.record()
+        elif self.scene is Scene.PAUSED:
+            self._handlePauseKey(key)
+
+    def _handleTitleKey(self, key: int) -> None:
+        previous = self.titleMenu.selectedIndex
+        action = self.titleMenu.handleKey(key)
+        self._playMenuFeedback(previous, self.titleMenu.selectedIndex, action)
+        if action == "start":
+            self.startGame()
+        elif action == "options":
+            self.scene = Scene.OPTIONS
+        elif action == "quit" or action == "back":
+            self.running = False
+
+    def _handleOptionsKey(self, key: int) -> None:
+        previous = self.optionsMenu.selectedIndex
+        action, settings = self.optionsMenu.handleKey(key)
+        self._playMenuFeedback(previous, self.optionsMenu.selectedIndex, action)
+        if action == "settingsChanged":
+            fullscreenChanged = settings.fullscreen != self.settings.fullscreen
+            self.settings = settings
+            saveSettings(settings, self.settingsPathOverride)
+            self.audio.applySettings(settings)
+            if fullscreenChanged:
+                self.window = self._createWindow()
+                if self.game is not None:
+                    self.game.window = self.window
+        elif action == "back":
+            self.scene = Scene.TITLE
+
+    def _handlePauseKey(self, key: int) -> None:
+        previous = self.pauseMenu.selectedIndex
+        action = self.pauseMenu.handleKey(key)
+        self._playMenuFeedback(previous, self.pauseMenu.selectedIndex, action)
+        if action == "continue" or action == "back":
+            self.scene = Scene.PLAYING
+            self._resetSessionInput()
+        elif action == "restart":
+            self.restartGame()
+        elif action == "title":
+            self.returnToTitle()
+        elif action == "quit":
+            self.running = False
+
+    def _playMenuFeedback(self, before: int, after: int, action: str | None) -> None:
+        if before != after:
+            self.audio.playSound("select")
+        elif action == "back":
+            self.audio.playSound("cancel")
+        elif action is not None:
+            self.audio.playSound("confirm")
+
+    def update(self) -> None:
+        if self.scene is Scene.PLAYING and self.game is not None:
+            self.game.update()
+
+    def render(self) -> None:
+        if self.scene is Scene.TITLE:
+            menuUi.drawTitle(self.canvas, self.titleBackground, self.titleMenu)
+        elif self.scene is Scene.OPTIONS:
+            menuUi.drawTitle(self.canvas, self.titleBackground, self.optionsMenu)
+        elif self.game is not None:
+            self.game.render(present=False)
+            if self.scene is Scene.PAUSED:
+                menuUi.drawOverlayMenu(self.canvas, "暂停", self.pauseMenu)
+        presentCanvas(self.window, self.canvas, self.windowSize)
+
+    def close(self) -> None:
+        self.audio.close()
+        menuUi.releaseCaches()
+        hud.releaseCaches()
 
 
 def main() -> None:
-    game = Game()
+    application = Application()
     try:
-        game.run()
+        application.run()
     finally:
-        # 顺序不能反：HUD 缓存的字体在 font 模块退出后就是废对象，
-        # 先丢缓存再 quit（理由见 hud.releaseCaches 的注释）。
-        hud.releaseCaches()
+        application.close()
         pygame.quit()
 
 

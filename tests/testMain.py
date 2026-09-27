@@ -19,6 +19,7 @@ from tests.game.conftest import makeBossSpawn
 from touhou import constants
 from touhou import main as mainModule
 from touhou.core.input import FrameInput
+from touhou.core.settings import loadSettings
 from touhou.core.vector2 import Vector2
 from touhou.game.enemyField import EnemyField
 from touhou.game.entities.boss import Boss
@@ -40,6 +41,99 @@ BAND_BELOW_PLAYFIELD = pygame.Rect(
 def game(monkeypatch) -> mainModule.Game:
     monkeypatch.setattr(mainModule, "chooseScaleFactor", lambda *args: 1)
     return mainModule.Game()
+
+
+@pytest.fixture
+def application(monkeypatch, tmp_path) -> mainModule.Application:
+    monkeypatch.setattr(mainModule, "chooseScaleFactor", lambda *args: 1)
+    app = mainModule.Application(settingsPathOverride=tmp_path / "settings.json")
+    yield app
+    app.close()
+
+
+def testApplicationStartsAtTitle(application):
+    assert application.scene is mainModule.Scene.TITLE
+    assert application.game is None
+
+
+def testStartingAndRestartingCreateFreshGameSessions(application):
+    application.startGame()
+    first = application.game
+    assert application.scene is mainModule.Scene.PLAYING
+
+    application.restartGame()
+
+    assert application.scene is mainModule.Scene.PLAYING
+    assert application.game is not first
+
+
+def testEscapePausesAndContinuePreservesSession(application):
+    application.startGame()
+    session = application.game
+    postKeydown(pygame.K_ESCAPE)
+    application.handleEvents()
+    assert application.scene is mainModule.Scene.PAUSED
+
+    postKeydown(pygame.K_z)
+    application.handleEvents()
+
+    assert application.scene is mainModule.Scene.PLAYING
+    assert application.game is session
+
+
+def testPausedApplicationDoesNotAdvanceTheGame(application):
+    application.startGame()
+    assert application.game is not None
+    application.scene = mainModule.Scene.PAUSED
+    before = application.game.backgroundOffset
+
+    application.update()
+
+    assert application.game.backgroundOffset == before
+
+
+def testReturningToTitleDropsSessionAndPendingInput(application):
+    application.startGame()
+    assert application.game is not None
+    application.game.pressLatch.record()
+    application.game.accumulator.advance(constants.STEP_SECONDS / 2)
+
+    application.returnToTitle()
+
+    assert application.scene is mainModule.Scene.TITLE
+    assert application.game is None
+
+
+def testOptionsChangesAreAppliedAndSaved(application):
+    postKeydown(pygame.K_DOWN)
+    postKeydown(pygame.K_z)
+    application.handleEvents()
+    assert application.scene is mainModule.Scene.OPTIONS
+
+    postKeydown(pygame.K_RIGHT)
+    application.handleEvents()
+
+    saved = loadSettings(application.settingsPathOverride)
+    assert saved.bgmVolume == 8
+    assert application.audio.settings.bgmVolume == 8
+
+
+@pytest.mark.parametrize(
+    ("windowSize", "expected"),
+    [
+        ((1280, 960), pygame.Rect(0, 0, 1280, 960)),
+        ((1500, 1000), pygame.Rect(110, 20, 1280, 960)),
+        ((320, 200), pygame.Rect(27, 0, 266, 200)),
+    ],
+)
+def testCanvasDestinationIsCenteredAndNeverCropped(windowSize, expected):
+    assert mainModule.canvasDestination(windowSize) == expected
+
+
+def testResizeEventUpdatesWindowSize(application):
+    pygame.event.post(pygame.event.Event(pygame.VIDEORESIZE, size=(900, 700), w=900, h=700))
+    application.handleEvents()
+    assert application.windowSize == (900, 700)
 
 
 def testGameDisablesTextInputForTheWindow(monkeypatch):
