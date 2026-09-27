@@ -45,7 +45,7 @@ def testTheRealCheckoutLooksRunnable():
 def testPathsComeFromThisFileNotFromTheWorkingDirectory(monkeypatch, tmp_path):
     """三个路径都由 `__file__` 推出来，**与当前工作目录无关**。
 
-    这不是理论问题：从别的目录用绝对路径调用 `python D:/.../run.py` 是很常见的
+    这不是理论问题：从别的目录用项目相对路径调用 `python run.py` 是很常见的
     用法（桌面快捷方式、批处理文件都这么干），而如果路径取的是 `Path(".")`，
     那种调用方式会去找**调用者**目录下的 `src/`，然后报「找不到源码」。
     """
@@ -132,7 +132,7 @@ def testNoAbsolutePathIsHardcoded():
     """`run.py` 里**一个写死的绝对路径都不许有**。
 
     这是它存在的理由：脚本要能被原样拷到任何机器、任何目录下运行。写死一个
-    `D:\\...` 之后，它在写它的那台机器上照样能跑，所以谁也不会发现——直到
+    写死某台机器的路径之后，它在写它的那台机器上照样能跑，所以谁也不会发现——直到
     别人拿到手。
 
     只扫字符串常量：判据是**字面量本身**长不长得像一个绝对位置（盘符、开头的
