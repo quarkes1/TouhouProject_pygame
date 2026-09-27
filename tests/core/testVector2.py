@@ -131,6 +131,49 @@ def testAngleDegIsAlwaysInZeroToThreeSixty():
     assert 0 <= Vector2(-1, -1).angleDeg() < 360
 
 
+def testAimingAtATargetPointsAtItFromEveryDirection():
+    """自机狙：从一点瞄准另一点，算出的角度必须真的指向目标。
+
+    参考项目就是用 acos（点积反余弦）算瞄准的，那只覆盖 [0°, 180°]，等于
+    丢掉了目标在源点上方还是下方这一半信息：自机跑到敌人上方时，锥形弹会整体
+    垂直镜像、朝反方向打。八个方位里正上、右上、左上三个会中招，所以八个都要测。
+
+    **为什么必须在纯数学层测、不能靠端到端测试兜底**：实测 arccos 写法在
+    下半屏（90°–270°）**完全正确**，只在**上半屏**出错。而敌人发射点在游戏区
+    上沿、自机被钳制在游戏区里，自机永远在发射点**下方**——瞄准角恒在下半屏。
+    所以「敌人打自机」这种端到端场景**再怎么写也抓不到这个 bug**；这正是它在
+    参考项目里长期没暴露的原因。只有让目标出现在上半屏的测试才有用，就是这一条。
+
+    也无法靠上一条互逆测试兜底：那条测的是 `Vector2.angleDeg` 与 `fromDeg` 互为
+    逆运算，只要 `angleDeg` 本身没被改坏它就绿。而参考项目这个 bug 根本不在共享的
+    向量方法里——它在**攻击代码**里，照抄时也会落在我们的攻击代码里，比如另写一个
+    `aimAt(origin, target)` 或把点积反余弦内联在某处。那种改法不碰 `Vector2`。
+    这条测的是「瞄准」这个**操作**的结果，公式写在哪儿都躲不过。
+
+    （顺带记一笔：把 `angleDeg` 真的换成 arccos 写法时，互逆测试因为角度列表里
+    恰好有 0、45、315 而**会**红。但那是运气，不是设计——它的用意从来不是覆盖瞄准。）
+
+    失败时不会崩溃，只会让弹幕「飞得对但打向错误方向」——比崩溃难查得多。
+    """
+    origin = Vector2(200.0, 200.0)
+    offsets = {
+        "正下": (0.0, 200.0),
+        "正上": (0.0, -200.0),
+        "正右": (200.0, 0.0),
+        "正左": (-200.0, 0.0),
+        "右下": (200.0, 200.0),
+        "左下": (-200.0, 200.0),
+        "右上": (200.0, -200.0),
+        "左上": (-200.0, -200.0),
+    }
+    for name, offset in offsets.items():
+        target = origin + Vector2(*offset)
+        aimAngleDeg = (target - origin).angleDeg()  # 这就是自机狙那一行
+        assert Vector2.fromDeg(aimAngleDeg, 1.0).toTuple() == pytest.approx(
+            (target - origin).normalize().toTuple()
+        ), f"瞄准{name}的目标时打偏了"
+
+
 def testRotateDegTurnsUpIntoRight():
     """把「正上」顺时针转 90° 应该得到「正右」。
 

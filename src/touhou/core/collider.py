@@ -17,6 +17,20 @@ from __future__ import annotations
 from touhou.core.vector2 import Vector2
 
 
+def circlesOverlap(one: Vector2, oneRadius: float, other: Vector2, otherRadius: float) -> bool:
+    """两个圆是否重叠。
+
+    用长度平方与半径和的平方比较，省掉一次开方。**严格小于号意味着相切不算
+    碰撞**——弹幕游戏里边缘擦过不该算命中。
+
+    单独成函数是因为「一对圆用哪两个半径」有两种问法：`Collider.checkCollision`
+    用双方各自的 `radius`，而敌机的**撞机判定**要用机体半径去比自机的判定点半径
+    （见 `Enemy.touches`）。写在两处的话，相切那条约定迟早会只改一边。
+    """
+    threshold = oneRadius + otherRadius
+    return (other - one).lengthSquared() < threshold * threshold
+
+
 class Collider:
     __slots__ = ("position", "radius")
 
@@ -25,13 +39,8 @@ class Collider:
         self.position = position if position is not None else Vector2.zero()
 
     def checkCollision(self, other: Collider) -> bool:
-        """两圆是否重叠。
-
-        用长度平方与半径和的平方比较，省掉一次开方。严格小于号意味着
-        相切不算碰撞——弹幕游戏里边缘擦过不该算命中。
-        """
-        threshold = self.radius + other.radius
-        return (other.position - self.position).lengthSquared() < threshold * threshold
+        """两圆是否重叠（各自用自己的 `radius`）。"""
+        return circlesOverlap(self.position, self.radius, other.position, other.radius)
 
     def distanceSquaredTo(self, point: Vector2) -> float:
         """到某点的距离平方。

@@ -41,3 +41,23 @@ def testPoCLineFallsInsidePlayfield():
 def testGrazeRadiusIsLargerThanHitbox():
     """擦弹圈必须大于判定点，否则擦弹系统没有存在空间。"""
     assert constants.PLAYER_GRAZE_RADIUS > constants.PLAYER_HITBOX_RADIUS
+
+
+def testBulletRadiiAreOrderedAndPositive():
+    assert 0 < constants.BULLET_RADIUS_SMALL < constants.BULLET_RADIUS_LARGE
+
+
+def testBulletCullMarginCoversTheLargestBulletSprite():
+    """出屏余量必须盖得住最大贴图的旋转外接矩形半宽。
+
+    余量肩负的**唯一**职责就是「贴图完整离场」——子弹不能在自己还有像素落在
+    游戏区内时被删掉。若将来出现更大的弹却没同步放大这个值，那颗弹会在贴边时
+    静默消失，看起来像偶发的渲染 bug。
+    """
+    largestBulletHalfExtent = 32 / 2 * (2**0.5)  # 现有最大贴图 32×32 转到 45°
+    assert constants.BULLET_CULL_MARGIN >= largestBulletHalfExtent
+
+
+def testBulletRadiiAreSmallerThanThePlayerGrazeRadius():
+    """敌弹判定半径必须远小于擦弹圈，否则「贴脸擦弹」不存在，游戏变成纯粹躲避。"""
+    assert constants.BULLET_RADIUS_LARGE < constants.PLAYER_GRAZE_RADIUS

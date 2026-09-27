@@ -35,9 +35,11 @@ ignore = ["N802", "N803", "N815", "N999"]
 [tool.mypy]
 strict = true
 mypy_path = "src"
-packages = ["touhou"]
+# 用 files 而不是 packages：根目录那个免安装的 run.py 也要一起查。
+# 它是别人拿到这个项目后第一个运行的文件，值得和包本身一样严。
+files = ["src/touhou", "run.py"]
 # tests/ 的 pytest 函数按惯例不带返回类型注解，不纳入 mypy strict 的检查范围；
-# 只检查 src/touhou 包本身。
+# 只检查 src/touhou 包本身与 run.py。
 exclude = ["tests"]
 
 [tool.pytest.ini_options]

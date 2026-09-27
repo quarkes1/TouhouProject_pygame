@@ -7,22 +7,43 @@
 # 统一开启延迟注解求值，理由见 vector2.py 的同类注释
 from __future__ import annotations
 
+import random
+
 import pygame
 
 from touhou import constants
 from touhou.core.display import chooseScaleFactor, scaledSize
 from touhou.core.gameLoop import FixedStepAccumulator
-from touhou.core.input import readKeyboardInput
+from touhou.core.input import PressLatch, readKeyboardInput
 from touhou.core.paths import assetPath
 from touhou.core.spriteSheet import SpriteSheet
 from touhou.core.vector2 import Vector2
+from touhou.game import collision
+from touhou.game.bulletField import BulletField
+from touhou.game.effectField import EffectField
+from touhou.game.enemyField import EnemyField
+from touhou.game.entities.boss import Boss
+from touhou.game.entities.bullet import BulletSpec
+from touhou.game.entities.effect import bakeExpandingRing
 from touhou.game.entities.player import Player
+from touhou.game.levelData import loadLevel
+from touhou.ui import bossBar, hud
 
 BACKGROUND_PATH_PARTS = ("sprites", "backgrounds", "background.png")
 PLAYER_SPRITE_PATH_PARTS = ("sprites", "entities", "marisa_forward.png")
 PLAYER_FRAME_WIDTH = 25
 PLAYER_FRAME_HEIGHT = 50
+PLAYER_SHOT_SPRITE_PATH_PARTS = ("sprites", "projectiles_and_items", "marisa_bullet.png")
+PLAYER_SHOT_FRAME_SIZE = 32  # 单帧 32×32 的一道光弹，不是帧表
+PLAYER_HITBOX_PATH_PARTS = ("sprites", "effects", "player_hitbox.png")
+DEATH_EFFECT_PATH_PARTS = ("sprites", "effects", "player_death_effect.png")
 BACKGROUND_SCROLL_SPEED = 0.5  # 像素/帧，向下滚动
+LEVEL_PATH_PARTS = ("levels", "level_1.json")
+
+# 随机弹幕的种子。**写死而不是取时间**：同一份输入必须产生同一场战斗，
+# 否则录像回放与逐帧调试都无从谈起（docs/DESIGN.md「主循环」）。
+# 要换一种随机局面就改这个数。
+RANDOM_SEED = 20260927
 
 
 class Game:
@@ -42,6 +63,17 @@ class Game:
         self.window = pygame.display.set_mode(windowSize)
         pygame.display.set_caption("TouhouProject")
 
+        # 关掉 SDL 的文本输入通道。**必须在 set_mode 之后调用。**
+        #
+        # 不关的话中文输入法会截走按键：pygame 建窗口时默认开启文本输入，
+        # 于是输入法对窗口生效，玩家按下任意字母键（比如 A）之后
+        # `pygame.key.get_pressed()` 就不再上报按键状态了——表现为
+        # 「按了 A 之后方向键全部失灵」，而按住 Shift 或把输入法切到英文就恢复。
+        # 这个 bug 在没有输入法的机器上复现不出来。
+        #
+        # 本项目不需要文字输入（将来做记分板输入名字时再按需 start_text_input）。
+        pygame.key.stop_text_input()
+
         # 所有绘制先落在这张 640×480 的画布上，最后一次性整数倍缩放
         self.canvas = pygame.Surface((constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)).convert()
 
@@ -51,12 +83,49 @@ class Game:
         playerSpriteSheet = SpriteSheet.fromFile(
             assetPath(*PLAYER_SPRITE_PATH_PARTS), PLAYER_FRAME_WIDTH, PLAYER_FRAME_HEIGHT
         )
+        # 判定点只在低速时画（规格 §6.2）。立绘有 25×50 而判定点直径 4px，
+        # 不画出来的话玩家没法判断自己站得有多准，而这正是低速模式存在的意义。
+        self.hitboxSprite = pygame.image.load(
+            str(assetPath(*PLAYER_HITBOX_PATH_PARTS))
+        ).convert_alpha()
+
+        # 冲击波特效：**一张**环形贴图（500×500，中空），不是帧序列——动画得靠缩放
+        # 烘出来。烘一次、放的时候只 blit，理由见 effect.py。
+        #
+        # 自机死亡与 BOSS 倒下用的是同一份帧：素材是同一张，烘两遍只是白占内存。
+        # 存在 `self` 上而不是从 `self.player` 里摸——BOSS 的特效不该依赖自机实例。
+        self.ringFrames = bakeExpandingRing(
+            pygame.image.load(str(assetPath(*DEATH_EFFECT_PATH_PARTS))).convert_alpha(),
+            constants.DEATH_EFFECT_BAKED_FRAMES,
+            constants.DEATH_RING_START_SCALE,
+            constants.DEATH_RING_END_SCALE,
+            constants.DEATH_RING_START_ALPHA,
+            constants.DEATH_RING_END_ALPHA,
+        )
+        self.ringFramesPerFrame = max(1, constants.DEATH_EFFECT_FRAMES // len(self.ringFrames))
+
         self.player = Player(
             position=Vector2(
                 constants.PLAYFIELD_X + constants.PLAYFIELD_WIDTH / 2,
                 constants.PLAYFIELD_Y + constants.PLAYFIELD_HEIGHT - 60,
             ),
             spriteSheet=playerSpriteSheet,
+            shotSpec=BulletSpec(
+                spriteSheet=SpriteSheet.fromFile(
+                    assetPath(*PLAYER_SHOT_SPRITE_PATH_PARTS),
+                    PLAYER_SHOT_FRAME_SIZE,
+                    PLAYER_SHOT_FRAME_SIZE,
+                ),
+                radius=constants.PLAYER_SHOT_RADIUS,
+                # 不跟着速度旋转：marisa_bullet 是一道竖直的光弹，转了反而歪。
+                rotatesToVelocity=False,
+                damage=constants.PLAYER_SHOT_DAMAGE,
+            ),
+            deathEffectFrames=self.ringFrames,
+            # 放雷暂时复用死亡那份扩散环（雷还没有自己的美术），但**传的是同一份
+            # 帧对象**、不是一个「共用开关」：等雷的素材到位，这里换一张烘好的表
+            # 就行，`Player` 那边一行不用动。
+            bombEffectFrames=self.ringFrames,
         )
 
         self.accumulator = FixedStepAccumulator(
@@ -64,6 +133,21 @@ class Game:
         )
         self.clock = pygame.time.Clock()
         self.running = True
+        self.pressLatch = PressLatch()
+
+        self.bulletField = BulletField()
+        # 自机子弹**另一个场**：两条碰撞路径互不相干（敌弹打自机、自机弹打敌机），
+        # 共用一个列表只会互相干扰。
+        self.shots = BulletField()
+        self.effects = EffectField()
+        self.level = loadLevel(assetPath(*LEVEL_PATH_PARTS))
+        # BOSS 与敌机同一个容器：BOSS 在引擎眼里就是「有血量的、会被打的东西」，
+        # 见 entities/boss.py。用关键字传，免得两个元组位置搞反。
+        self.enemyField = EnemyField(
+            spawns=self.level.spawns,
+            rng=random.Random(RANDOM_SEED),
+            bossSpawns=self.level.bosses,
+        )
 
     def loadBackground(self) -> pygame.Surface:
         """把 1200×800 的背景缩到游戏区大小。
@@ -103,18 +187,72 @@ class Game:
             if isQuit or isEscape:
                 self.running = False
 
+            # 炸弹走**事件**而不是轮询：要的是「刚刚按下」。这里只记一笔，
+            # 由下一个真正执行的逻辑步取走——一次渲染帧可能跑 0~5 步，
+            # 记在当帧的输入里会让一次按下变成三次（或整帧被丢掉）。
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_x:
+                self.pressLatch.record()
+
     def update(self) -> None:
-        """推进一帧游戏逻辑。"""
-        self.player.update(readKeyboardInput(pygame.key.get_pressed()))
+        """推进一帧游戏逻辑。
+
+        顺序是承重的，尤其那句「子弹先飞、再动自机与敌机」：新放出的子弹
+        必须**晚于**自己那个场的 update()，才会停在炮口而不是凭空飞出一帧。
+        """
+        # 三个场先推进。自机的命中判定在后面，于是它比较的是**同一帧**的两个
+        # 位置——自机这一步刚走到的位置 vs 敌弹这一步刚飞到的位置。反过来写
+        # 的话自机拿新位置去比旧弹位，判定永远慢一帧。
+        #
+        # 特效也在这里推进（而不是紧挨着自机）：这样死亡那一帧放出的冲击波
+        # 停在第一帧，与子弹「出生那帧停在炮口」是同一条规矩。
+        self.bulletField.update()
+        self.shots.update()
+        self.effects.update()
+
+        frameInput = self.pressLatch.consume(readKeyboardInput(pygame.key.get_pressed()))
+        self.player.update(frameInput, self.shots, self.bulletField, self.enemyField, self.effects)
+
+        # BOSS 有可能死在这两步中的任何一步：`enemyField.update` 里回收，或者
+        # `resolvePlayerShots` 里结算。所以先留一份引用，等两步都走完再看它还在不在。
+        bossBefore = self.enemyField.boss
+
+        # 敌机在自己 update 里打出齐射。它排在 bulletField.update() 之后，
+        # 所以本帧新放出的敌弹不推进（契约见 bulletField.update 的注释）；
+        # 自机位置在这一句之前已经更新过，于是自机狙瞄的是**本帧**的自机。
+        self.enemyField.update(self.bulletField, self.player.position)
+
+        # 结算自机子弹打到了谁。必须排在这两个场都动完之后：子弹与敌机
+        # 这一帧的最终位置都定下来了，判定才不会漏掉「本帧刚好撞上」的那一发。
+        collision.resolvePlayerShots(self.shots, self.enemyField, self.bulletField)
+        self.celebrateBossDefeat(bossBefore)
 
         # 背景缓慢下滚，避免画面完全静止
         self.backgroundOffset = (
             self.backgroundOffset + BACKGROUND_SCROLL_SPEED
         ) % constants.PLAYFIELD_HEIGHT
 
+    def celebrateBossDefeat(self, bossBefore: Boss | None) -> None:
+        """BOSS 被打倒的那一帧，在原地炸一下。
+
+        位置要从 `bossBefore` 上取——走到这里 `enemyField.boss` 已经是 None 了。
+        引用还在，对象还在，`position` 也还是倒下那一刻的位置。
+
+        **只有被打死的才炸**：脚本自己跑完而退场（血还没掉光）不该有爆炸，
+        与「飞走的敌人不掉东西」是同一条区分。
+        """
+        if bossBefore is None or self.enemyField.boss is not None:
+            return
+        if not bossBefore.isDead():
+            return
+        self.effects.spawn(self.ringFrames, bossBefore.position, self.ringFramesPerFrame)
+
     def render(self) -> None:
         self.drawPlayfield()
-        self.drawHudPlaceholder()
+        # 血条排在游戏区之后（不然会被子弹盖住）、HUD 之前（它只占游戏区那 384px，
+        # 与右侧面板不重叠）。BOSS 不在场时它自己什么都不画。
+        self.drawBossBar()
+        # HUD 只收裸值，不认自机对象——它因此可以脱离游戏逻辑单独测试。
+        hud.drawHud(self.canvas, self.player.lives, self.player.bombs, self.player.power)
         self.blitToWindow()
         pygame.display.flip()
 
@@ -134,28 +272,57 @@ class Game:
         )
         self.canvas.blit(self.background, (constants.PLAYFIELD_X, constants.PLAYFIELD_Y + offset))
 
+        # 层次：敌机 → 自机 → 特效 → 自机子弹 → 敌弹，与原作一致（自己的弹压在
+        # 敌机之上，敌弹压在一切之上——躲弹时最该看清的就是它）。
+        # 特效压在自机之上：自机死亡的冲击波是**盖着自机**炸开的。
+        self.drawEnemies()
         self.drawPlayer()
+        self.effects.draw(self.canvas)
+        # 在裁剪区内画子弹：它们因此不会渗进右侧 HUD 条，也不会掉进游戏区下沿
+        # 那条 16px 边带。这不是可选的——关卡里的敌人会在游戏区外（含 HUD 区）
+        # 开火，子弹从那里飞进场内。
+        self.shots.draw(self.canvas)
+        self.bulletField.draw(self.canvas)
 
         self.canvas.set_clip(previousClip)
 
-    def drawPlayer(self) -> None:
-        """以中心点对齐绘制自机。
+    def blitCentered(self, surface: pygame.Surface, center: Vector2) -> None:
+        """把贴图以**中心点**对齐画到 center 处。
 
-        不能直接 blit 到 position——blit 的第二个参数是左上角，而
-        position 是中心点。也没有用 position - halfSize：倾斜立绘经
-        pygame.transform.rotate 之后外接矩形会变大，那样算会偏。
-        用 surface 自己的 rect 做 center 对齐，两种立绘都准。
+        不能直接 blit(position)——blit 的第二个参数是左上角，而 position 是
+        中心点。也不能用 position - halfSize：经 pygame.transform.rotate 之后
+        外接矩形会变大（实测 16×16 转到 45° 变成 22×22），那样算会偏出 3px 以上。
+        用 surface 自己的 rect 做 center 对齐，任何尺寸与角度都准。
         """
-        frame = self.player.currentFrame()
-        self.canvas.blit(frame, frame.get_rect(center=self.player.position.toTuple()))
+        self.canvas.blit(surface, surface.get_rect(center=center.toTuple()))
 
-    def drawHudPlaceholder(self) -> None:
-        """HUD 区先留空。真正的 HUD 在 Plan D 里实现。"""
-        hudX = constants.PLAYFIELD_X + constants.PLAYFIELD_WIDTH
-        pygame.draw.rect(
+    def drawPlayer(self) -> None:
+        # 无敌期间立绘闪烁。没有这一条的话「现在是不是无敌」肉眼看不出来，
+        # 而刚复活、刚放完炸弹时玩家最需要知道的就是这件事。
+        if not self.player.isVisible():
+            return
+
+        self.blitCentered(self.player.currentFrame(), self.player.position)
+
+        # 判定点只在**低速**时画（规格 §6.2）。常态下 4px 的判定点会一直
+        # 悬在立绘中间，反而干扰视线；按住 Shift 才显示，正好配上「慢下来精确躲弹」。
+        if self.player.slow and self.player.isAlive():
+            self.blitCentered(self.hitboxSprite, self.player.position)
+
+    def drawEnemies(self) -> None:
+        self.enemyField.draw(self.canvas)
+
+    def drawBossBar(self) -> None:
+        boss = self.enemyField.boss
+        if boss is None:
+            return
+        bossBar.drawBossBar(
             self.canvas,
-            (16, 16, 24),
-            (hudX, 0, constants.LOGICAL_WIDTH - hudX, constants.LOGICAL_HEIGHT),
+            boss.name,
+            boss.hp,
+            boss.maxHp,
+            boss.segments,
+            boss.phaseIndex,
         )
 
     def blitToWindow(self) -> None:
@@ -174,6 +341,9 @@ def main() -> None:
     try:
         game.run()
     finally:
+        # 顺序不能反：HUD 缓存的字体在 font 模块退出后就是废对象，
+        # 先丢缓存再 quit（理由见 hud.releaseCaches 的注释）。
+        hud.releaseCaches()
         pygame.quit()
 
 
