@@ -57,6 +57,53 @@ def testApplicationStartsAtTitle(application):
     assert application.game is None
 
 
+def testTitleMenuStartsTutorial(application):
+    application.titleMenu.selectedIndex = 1
+
+    application._handleKey(pygame.K_z)
+
+    assert application.scene is mainModule.Scene.TUTORIAL
+    assert application.game is not None
+    assert application.game.level.name == "tutorial"
+
+
+def testPauseFromTutorialReturnsToTutorial(application):
+    application.startTutorial()
+
+    application._handleKey(pygame.K_ESCAPE)
+    assert application.scene is mainModule.Scene.PAUSED
+    application._handleKey(pygame.K_z)
+
+    assert application.scene is mainModule.Scene.TUTORIAL
+
+
+def testCompletedTutorialCanStartNormalStage(application):
+    application.startTutorial()
+    assert application.tutorial is not None
+    for key in (pygame.K_LEFT, pygame.K_LSHIFT, pygame.K_z, pygame.K_x, pygame.K_ESCAPE):
+        application.tutorial.observeKey(key)
+    application.scene = mainModule.Scene.TUTORIAL
+
+    application._handleKey(pygame.K_z)
+
+    assert application.scene is mainModule.Scene.PLAYING
+    assert application.game is not None
+    assert application.game.level.name == "level_1"
+
+
+def testCompletedTutorialCanReturnToTitle(application):
+    application.startTutorial()
+    assert application.tutorial is not None
+    for key in (pygame.K_LEFT, pygame.K_LSHIFT, pygame.K_z, pygame.K_x, pygame.K_ESCAPE):
+        application.tutorial.observeKey(key)
+    application.scene = mainModule.Scene.TUTORIAL
+
+    application._handleKey(pygame.K_x)
+
+    assert application.scene is mainModule.Scene.TITLE
+    assert application.game is None
+
+
 def testApplicationStartsAtLogicalSizeInsteadOfFillingDesktop(monkeypatch, tmp_path):
     monkeypatch.setattr(mainModule, "chooseScaleFactor", lambda *args: 3)
     app = mainModule.Application(settingsPathOverride=tmp_path / "settings.json")
@@ -116,6 +163,7 @@ def testReturningToTitleDropsSessionAndPendingInput(application):
 
 
 def testOptionsChangesAreAppliedAndSaved(application):
+    postKeydown(pygame.K_DOWN)
     postKeydown(pygame.K_DOWN)
     postKeydown(pygame.K_z)
     application.handleEvents()

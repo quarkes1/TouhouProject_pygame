@@ -13,7 +13,9 @@ from touhou.ui.menu import (
     MenuItem,
     OptionsMenu,
     drawTitle,
+    drawTutorialPrompt,
     menuItemX,
+    tutorialFont,
 )
 
 
@@ -92,6 +94,16 @@ def testLongMenuItemIsShiftedInsideLogicalCanvas():
 
     assert x == 273
     assert x + 351 <= 624
+
+
+def testTutorialPromptStaysInsideCanvas():
+    canvas = pygame.Surface((640, 480))
+    text = "TRAINING COMPLETE - Z: START  X: TITLE"
+
+    panel = drawTutorialPrompt(canvas, text, True)
+
+    assert pygame.Rect(0, 0, 640, 480).contains(panel)
+    assert tutorialFont().size(text)[0] <= panel.width - 16
 
 
 def testTitleDrawUsesDifferentColorsForSelection():

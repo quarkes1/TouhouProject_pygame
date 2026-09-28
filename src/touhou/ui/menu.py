@@ -14,6 +14,7 @@ from touhou.core.settings import Settings
 FONT_PATH_PARTS = ("fonts", "DFPPOPCorn-W12.ttf")
 FONT_SIZE = 28
 TITLE_FONT_SIZE = 38
+TUTORIAL_FONT_SIZE = 20
 SELECTED_COLOR = (255, 72, 96)
 UNSELECTED_COLOR = (248, 240, 224)
 SHADOW_COLOR = (32, 8, 16)
@@ -114,9 +115,15 @@ def titleFont() -> pygame.font.Font:
     return pygame.font.Font(str(assetPath(*FONT_PATH_PARTS)), TITLE_FONT_SIZE)
 
 
+@cache
+def tutorialFont() -> pygame.font.Font:
+    return pygame.font.Font(str(assetPath(*FONT_PATH_PARTS)), TUTORIAL_FONT_SIZE)
+
+
 def releaseCaches() -> None:
     menuFont.cache_clear()
     titleFont.cache_clear()
+    tutorialFont.cache_clear()
 
 
 def menuItemX(canvasWidth: int, textWidth: int, baseX: int, selected: bool) -> int:
@@ -147,6 +154,20 @@ def drawOverlayMenu(canvas: pygame.Surface, title: str, menu: MenuView) -> None:
     heading = titleFont().render(title, True, UNSELECTED_COLOR)
     canvas.blit(heading, heading.get_rect(center=(canvas.get_width() // 2, 125)))
     _drawMenuItems(canvas, menu, x=canvas.get_width() // 2 - 70, y=190)
+
+
+def drawTutorialPrompt(canvas: pygame.Surface, prompt: str, completed: bool) -> pygame.Rect:
+    """在安全边距内绘制教学步骤，并返回提示板范围供布局测试。"""
+    text = "TRAINING COMPLETE - Z: START  X: TITLE" if completed else prompt
+    panel = pygame.Rect(8, 8, canvas.get_width() - 16, 48)
+    background = pygame.Surface(panel.size, pygame.SRCALPHA)
+    background.fill((8, 4, 12, 196))
+    canvas.blit(background, panel)
+
+    rendered = tutorialFont().render(text, True, UNSELECTED_COLOR)
+    textRect = rendered.get_rect(center=panel.center)
+    canvas.blit(rendered, textRect)
+    return panel
 
 
 def _drawMenuItems(

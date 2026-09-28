@@ -31,6 +31,7 @@ from touhou.game.entities.bullet import BulletSpec
 from touhou.game.entities.effect import bakeExpandingRing
 from touhou.game.entities.player import Player, State
 from touhou.game.levelData import loadLevel
+from touhou.game.tutorial import TutorialController
 from touhou.ui import bossBar, hud
 from touhou.ui import menu as menuUi
 
@@ -44,6 +45,7 @@ PLAYER_HITBOX_PATH_PARTS = ("sprites", "effects", "player_hitbox.png")
 DEATH_EFFECT_PATH_PARTS = ("sprites", "effects", "player_death_effect.png")
 BACKGROUND_SCROLL_SPEED = 0.5  # 像素/帧，向下滚动
 LEVEL_PATH_PARTS = ("levels", "level_1.json")
+TUTORIAL_LEVEL_PATH_PARTS = ("levels", "tutorial.json")
 TITLE_BACKGROUND_PATH_PARTS = ("sprites", "backgrounds", "title_screen_wallpaper.jpg")
 
 # 随机弹幕的种子。**写死而不是取时间**：同一份输入必须产生同一场战斗，
@@ -56,6 +58,7 @@ class Scene(Enum):
     TITLE = auto()
     OPTIONS = auto()
     PLAYING = auto()
+    TUTORIAL = auto()
     PAUSED = auto()
     GAME_OVER = auto()
     STAGE_CLEAR = auto()
@@ -416,9 +419,12 @@ class Application:
         self.running = True
         self.clock = pygame.time.Clock()
         self.game: Game | None = None
+        self.tutorial: TutorialController | None = None
+        self.pausedScene = Scene.PLAYING
         self.titleMenu = menuUi.Menu(
             (
                 menuUi.MenuItem("START", "start"),
+                menuUi.MenuItem("TUTORIAL", "tutorial"),
                 menuUi.MenuItem("OPTION", "options"),
                 menuUi.MenuItem("QUIT", "quit"),
             )
@@ -456,14 +462,26 @@ class Application:
         while self.running:
             realDeltaSeconds = self.clock.tick(constants.FPS) / 1000.0
             self.handleEvents()
-            if self.scene is Scene.PLAYING and self.game is not None:
+            if self.scene in (Scene.PLAYING, Scene.TUTORIAL) and self.game is not None:
                 for _ in range(self.game.accumulator.advance(realDeltaSeconds)):
                     self.update()
             self.render()
 
     def startGame(self) -> None:
         self.game = Game(self.window, self.canvas)
+        self.tutorial = None
         self.scene = Scene.PLAYING
+        self._resetSessionInput()
+        self.previousBoss = None
+        self.previousPlayerState = self.game.player.state
+        self.previousShotCount = len(self.game.shots)
+        self.previousBombs = self.game.player.bombs
+        self.audio.playMusic("stage")
+
+    def startTutorial(self) -> None:
+        self.game = Game(self.window, self.canvas, assetPath(*TUTORIAL_LEVEL_PATH_PARTS))
+        self.tutorial = TutorialController()
+        self.scene = Scene.TUTORIAL
         self._resetSessionInput()
         self.previousBoss = None
         self.previousPlayerState = self.game.player.state
@@ -478,6 +496,7 @@ class Application:
         if self.game is not None:
             self._resetSessionInput()
         self.game = None
+        self.tutorial = None
         self.scene = Scene.TITLE
         self.audio.playMusic("title")
 
@@ -510,11 +529,14 @@ class Application:
             self._handleOptionsKey(key)
         elif self.scene is Scene.PLAYING:
             if key == pygame.K_ESCAPE:
+                self.pausedScene = Scene.PLAYING
                 self.scene = Scene.PAUSED
                 self._resetSessionInput()
                 self.audio.playSound("cancel")
             elif key == pygame.K_x and self.game is not None:
                 self.game.pressLatch.record()
+        elif self.scene is Scene.TUTORIAL:
+            self._handleTutorialKey(key)
         elif self.scene is Scene.PAUSED:
             self._handlePauseKey(key)
         elif self.scene in (Scene.GAME_OVER, Scene.STAGE_CLEAR):
@@ -526,6 +548,8 @@ class Application:
         self._playMenuFeedback(previous, self.titleMenu.selectedIndex, action)
         if action == "start":
             self.startGame()
+        elif action == "tutorial":
+            self.startTutorial()
         elif action == "options":
             self.scene = Scene.OPTIONS
         elif action == "quit" or action == "back":
@@ -552,10 +576,13 @@ class Application:
         action = self.pauseMenu.handleKey(key)
         self._playMenuFeedback(previous, self.pauseMenu.selectedIndex, action)
         if action == "continue" or action == "back":
-            self.scene = Scene.PLAYING
+            self.scene = self.pausedScene
             self._resetSessionInput()
         elif action == "restart":
-            self.restartGame()
+            if self.pausedScene is Scene.TUTORIAL:
+                self.startTutorial()
+            else:
+                self.restartGame()
         elif action == "title":
             self.returnToTitle()
         elif action == "quit":
@@ -572,6 +599,25 @@ class Application:
         elif action == "quit":
             self.running = False
 
+    def _handleTutorialKey(self, key: int) -> None:
+        if self.tutorial is None or self.game is None:
+            return
+        if self.tutorial.completed:
+            if key in (pygame.K_z, pygame.K_RETURN):
+                self.startGame()
+            elif key in (pygame.K_x, pygame.K_ESCAPE):
+                self.returnToTitle()
+            return
+
+        self.tutorial.observeKey(key)
+        if key == pygame.K_ESCAPE:
+            self.pausedScene = Scene.TUTORIAL
+            self.scene = Scene.PAUSED
+            self._resetSessionInput()
+            self.audio.playSound("cancel")
+        elif key == pygame.K_x:
+            self.game.pressLatch.record()
+
     def _playMenuFeedback(self, before: int, after: int, action: str | None) -> None:
         if before != after:
             self.audio.playSound("select")
@@ -581,9 +627,11 @@ class Application:
             self.audio.playSound("confirm")
 
     def update(self) -> None:
-        if self.scene is Scene.PLAYING and self.game is not None:
+        if self.scene in (Scene.PLAYING, Scene.TUTORIAL) and self.game is not None:
             self.game.update()
             self._syncGameplayAudio()
+            if self.scene is Scene.TUTORIAL:
+                return
             if self.game.player.state is State.DEAD:
                 self.scene = Scene.GAME_OVER
                 self._resetSessionInput()
@@ -619,7 +667,11 @@ class Application:
             menuUi.drawTitle(self.canvas, self.titleBackground, self.optionsMenu)
         elif self.game is not None:
             self.game.render(present=False)
-            if self.scene is Scene.PAUSED:
+            if self.scene is Scene.TUTORIAL and self.tutorial is not None:
+                menuUi.drawTutorialPrompt(
+                    self.canvas, self.tutorial.currentPrompt, self.tutorial.completed
+                )
+            elif self.scene is Scene.PAUSED:
                 menuUi.drawOverlayMenu(self.canvas, "PAUSE", self.pauseMenu)
             elif self.scene is Scene.GAME_OVER:
                 menuUi.drawOverlayMenu(self.canvas, "GAME OVER", self.resultMenu)
