@@ -45,9 +45,7 @@ def testMissingFieldsKeepTheirDefaults(tmp_path):
 def testSettingsAreClampedAndRoundTrip(tmp_path):
     path = tmp_path / "nested" / "settings.json"
     path.parent.mkdir()
-    path.write_text(
-        '{"bgmVolume": 99, "soundVolume": -2, "fullscreen": true}', encoding="utf-8"
-    )
+    path.write_text('{"bgmVolume": 99, "soundVolume": -2, "fullscreen": true}', encoding="utf-8")
 
     loaded = loadSettings(path)
 
@@ -58,9 +56,7 @@ def testSettingsAreClampedAndRoundTrip(tmp_path):
 
 def testBooleanAndStringVolumesDoNotMasqueradeAsNumbers(tmp_path):
     path = tmp_path / "settings.json"
-    path.write_text(
-        '{"bgmVolume": true, "soundVolume": "4", "fullscreen": 1}', encoding="utf-8"
-    )
+    path.write_text('{"bgmVolume": true, "soundVolume": "4", "fullscreen": 1}', encoding="utf-8")
     assert loadSettings(path) == Settings()
 
 

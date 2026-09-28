@@ -2,8 +2,8 @@
 
 用 Python 和 pygame-ce 制作的东方 Project 教学版弹幕游戏。
 
-目前已有完整的一关基础流程：自机移动与射击、低速模式、炸弹、残机、敌机波次、
-弹幕、碰撞、中 BOSS、HUD 和关卡数据加载。
+目前已有完整的一关流程：标题与设置菜单、自机战斗、敌机波次、中 BOSS、暂停、
+Game Over、Stage Clear、BGM、音效以及重新开始或返回标题。
 
 ## 运行源码
 
@@ -30,6 +30,8 @@ dist/TouhouProject/TouhouProject.exe
 
 发布时必须复制整个 `dist/TouhouProject/` 文件夹，不能只复制 exe。
 
+窗口可自由拖动缩放，画面会保持 4:3 并居中；设置菜单可切换全屏。
+
 ## 操作
 
 | 按键 | 功能 |
@@ -39,6 +41,18 @@ dist/TouhouProject/TouhouProject.exe
 | X | 炸弹 |
 | Shift | 低速移动 |
 | Esc | 暂停 / 返回 |
+
+菜单中使用方向键选择，Z 或 Enter 确认，X 或 Esc 返回。最后一命死亡或完成关卡后，
+可以重新开始、返回标题或退出。
+
+## 设置
+
+设置菜单可分别调整 BGM 和音效音量，并切换窗口/全屏。设置会自动保存：
+
+- Windows：`%APPDATA%/TouhouProject/settings.json`
+- 其他环境：用户目录下的 `.touhou-project/settings.json`
+
+配置损坏或缺少字段时会自动使用安全默认值，不影响游戏启动。
 
 ## 打包
 

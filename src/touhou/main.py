@@ -130,9 +130,9 @@ class Game:
         pygame.key.stop_text_input()
 
         # 所有绘制先落在这张 640×480 的画布上，最后一次性整数倍缩放
-        self.canvas = canvas or pygame.Surface(
-            (constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)
-        ).convert()
+        self.canvas = (
+            canvas or pygame.Surface((constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)).convert()
+        )
 
         self.background = self.loadBackground()
         self.backgroundOffset = 0.0
@@ -402,17 +402,13 @@ class Application:
         scaleFactor = chooseScaleFactor(
             info.current_w, info.current_h, constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT
         )
-        self.windowSize = scaledSize(
-            constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, scaleFactor
-        )
+        self.windowSize = scaledSize(constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, scaleFactor)
         self.settingsPathOverride = settingsPathOverride
         self.settings = loadSettings(settingsPathOverride)
         self.window = self._createWindow()
         pygame.display.set_caption("TouhouProject")
         pygame.key.stop_text_input()
-        self.canvas = pygame.Surface(
-            (constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)
-        ).convert()
+        self.canvas = pygame.Surface((constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)).convert()
         self.titleBackground = pygame.image.load(
             str(assetPath(*TITLE_BACKGROUND_PATH_PARTS))
         ).convert()

@@ -34,9 +34,7 @@ def testMenuSupportsDownEnterAndBackKeys():
 
 
 def testOneKeyEventMovesExactlyOneMenuItem():
-    menu = Menu(
-        (MenuItem("一", "one"), MenuItem("二", "two"), MenuItem("三", "three"))
-    )
+    menu = Menu((MenuItem("一", "one"), MenuItem("二", "two"), MenuItem("三", "three")))
     menu.handleKey(pygame.K_DOWN)
     assert menu.selectedIndex == 1
 

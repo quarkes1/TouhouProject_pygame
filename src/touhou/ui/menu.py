@@ -81,13 +81,9 @@ class OptionsMenu:
         confirmToggle = key in (pygame.K_z, pygame.K_RETURN)
         changed = self.settings
         if self.selectedIndex == 0 and direction:
-            changed = replace(
-                changed, bgmVolume=max(0, min(10, changed.bgmVolume + direction))
-            )
+            changed = replace(changed, bgmVolume=max(0, min(10, changed.bgmVolume + direction)))
         elif self.selectedIndex == 1 and direction:
-            changed = replace(
-                changed, soundVolume=max(0, min(10, changed.soundVolume + direction))
-            )
+            changed = replace(changed, soundVolume=max(0, min(10, changed.soundVolume + direction)))
         elif self.selectedIndex == 2 and (direction or confirmToggle):
             changed = replace(changed, fullscreen=not changed.fullscreen)
 
