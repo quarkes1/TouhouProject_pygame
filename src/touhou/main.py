@@ -398,11 +398,9 @@ class Application:
 
     def __init__(self, settingsPathOverride: Path | None = None) -> None:
         pygame.init()
-        info = pygame.display.Info()
-        scaleFactor = chooseScaleFactor(
-            info.current_w, info.current_h, constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT
-        )
-        self.windowSize = scaledSize(constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, scaleFactor)
+        # 启动时使用原生逻辑尺寸，给窗口边框、任务栏和用户拖拽留出空间。
+        # 画面会在 VIDEORESIZE 后按窗口实际大小重新缩放。
+        self.windowSize = (constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)
         self.windowedSize = self.windowSize
         self.settingsPathOverride = settingsPathOverride
         self.settings = loadSettings(settingsPathOverride)

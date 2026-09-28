@@ -57,6 +57,16 @@ def testApplicationStartsAtTitle(application):
     assert application.game is None
 
 
+def testApplicationStartsAtLogicalSizeInsteadOfFillingDesktop(monkeypatch, tmp_path):
+    monkeypatch.setattr(mainModule, "chooseScaleFactor", lambda *args: 3)
+    app = mainModule.Application(settingsPathOverride=tmp_path / "settings.json")
+    try:
+        assert app.windowedSize == (constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT)
+        assert app.windowSize == app.windowedSize
+    finally:
+        app.close()
+
+
 def testStartingAndRestartingCreateFreshGameSessions(application):
     application.startGame()
     first = application.game

@@ -13,6 +13,7 @@ from touhou.ui.menu import (
     MenuItem,
     OptionsMenu,
     drawTitle,
+    menuItemX,
 )
 
 
@@ -84,6 +85,13 @@ def testOptionsReturnItemConfirmsBack():
     menu = OptionsMenu(Settings())
     menu.selectedIndex = 3
     assert menu.handleKey(pygame.K_RETURN)[0] == "back"
+
+
+def testLongMenuItemIsShiftedInsideLogicalCanvas():
+    x = menuItemX(canvasWidth=640, textWidth=351, baseX=408, selected=False)
+
+    assert x == 273
+    assert x + 351 <= 624
 
 
 def testTitleDrawUsesDifferentColorsForSelection():

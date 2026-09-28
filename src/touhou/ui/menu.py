@@ -21,6 +21,7 @@ MENU_X = 408
 MENU_Y = 205
 ITEM_GAP = 43
 SELECTED_OFFSET = -10
+MENU_RIGHT_MARGIN = 16
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +119,12 @@ def releaseCaches() -> None:
     titleFont.cache_clear()
 
 
+def menuItemX(canvasWidth: int, textWidth: int, baseX: int, selected: bool) -> int:
+    """保留预期起点，但把长菜单项限制在逻辑画布右边界内。"""
+    intendedX = baseX + (SELECTED_OFFSET if selected else 0)
+    return min(intendedX, canvasWidth - MENU_RIGHT_MARGIN - textWidth)
+
+
 def drawTitle(canvas: pygame.Surface, background: pygame.Surface, menu: MenuView) -> None:
     """绘制标题背景和右侧纵向菜单。"""
     if background.get_size() == canvas.get_size():
@@ -149,7 +156,7 @@ def _drawMenuItems(
     for index, item in enumerate(menu.items):
         selected = index == menu.selectedIndex
         color = SELECTED_COLOR if selected else UNSELECTED_COLOR
-        itemX = x + (SELECTED_OFFSET if selected else 0)
+        itemX = menuItemX(canvas.get_width(), font.size(item.label)[0], x, selected)
         _drawShadowedText(canvas, font, item.label, (itemX, y + index * ITEM_GAP), color)
 
 
