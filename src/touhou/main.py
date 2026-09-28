@@ -66,21 +66,19 @@ def canvasDestination(windowSize: tuple[int, int]) -> pygame.Rect:
     windowWidth, windowHeight = windowSize
     logicalWidth = constants.LOGICAL_WIDTH
     logicalHeight = constants.LOGICAL_HEIGHT
-    if windowWidth >= logicalWidth and windowHeight >= logicalHeight:
-        integerFactor = max(1, min(windowWidth // logicalWidth, windowHeight // logicalHeight))
-        width = logicalWidth * integerFactor
-        height = logicalHeight * integerFactor
+    if windowWidth * logicalHeight <= windowHeight * logicalWidth:
+        width = max(1, windowWidth)
+        height = max(1, windowWidth * logicalHeight // logicalWidth)
     else:
-        shrinkFactor = min(windowWidth / logicalWidth, windowHeight / logicalHeight)
-        width = max(1, int(logicalWidth * shrinkFactor))
-        height = max(1, int(logicalHeight * shrinkFactor))
+        height = max(1, windowHeight)
+        width = max(1, windowHeight * logicalWidth // logicalHeight)
     return pygame.Rect((windowWidth - width) // 2, (windowHeight - height) // 2, width, height)
 
 
 def presentCanvas(
     window: pygame.Surface, canvas: pygame.Surface, windowSize: tuple[int, int]
 ) -> None:
-    """把固定逻辑画布缩放到可变窗口中央，并用黑色填满边带。"""
+    """把固定逻辑画布等比缩放到窗口中央，只保留最小必要边带。"""
     destination = canvasDestination(windowSize)
     window.fill((0, 0, 0))
     if destination.size == canvas.get_size():

@@ -133,7 +133,8 @@ def testOptionsChangesAreAppliedAndSaved(application):
     ("windowSize", "expected"),
     [
         ((1280, 960), pygame.Rect(0, 0, 1280, 960)),
-        ((1500, 1000), pygame.Rect(110, 20, 1280, 960)),
+        ((1500, 1000), pygame.Rect(83, 0, 1333, 1000)),
+        ((900, 700), pygame.Rect(0, 12, 900, 675)),
         ((320, 200), pygame.Rect(27, 0, 266, 200)),
     ],
 )
