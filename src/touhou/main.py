@@ -403,6 +403,7 @@ class Application:
             info.current_w, info.current_h, constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT
         )
         self.windowSize = scaledSize(constants.LOGICAL_WIDTH, constants.LOGICAL_HEIGHT, scaleFactor)
+        self.windowedSize = self.windowSize
         self.settingsPathOverride = settingsPathOverride
         self.settings = loadSettings(settingsPathOverride)
         self.window = self._createWindow()
@@ -420,25 +421,25 @@ class Application:
         self.game: Game | None = None
         self.titleMenu = menuUi.Menu(
             (
-                menuUi.MenuItem("开始游戏", "start"),
-                menuUi.MenuItem("设置", "options"),
-                menuUi.MenuItem("退出", "quit"),
+                menuUi.MenuItem("START", "start"),
+                menuUi.MenuItem("OPTION", "options"),
+                menuUi.MenuItem("QUIT", "quit"),
             )
         )
         self.optionsMenu = menuUi.OptionsMenu(self.settings)
         self.pauseMenu = menuUi.Menu(
             (
-                menuUi.MenuItem("继续", "continue"),
-                menuUi.MenuItem("重新开始", "restart"),
-                menuUi.MenuItem("返回标题", "title"),
-                menuUi.MenuItem("退出", "quit"),
+                menuUi.MenuItem("CONTINUE", "continue"),
+                menuUi.MenuItem("RESTART", "restart"),
+                menuUi.MenuItem("RETURN TO TITLE", "title"),
+                menuUi.MenuItem("QUIT", "quit"),
             )
         )
         self.resultMenu = menuUi.Menu(
             (
-                menuUi.MenuItem("重新开始", "restart"),
-                menuUi.MenuItem("返回标题", "title"),
-                menuUi.MenuItem("退出", "quit"),
+                menuUi.MenuItem("RESTART", "restart"),
+                menuUi.MenuItem("RETURN TO TITLE", "title"),
+                menuUi.MenuItem("QUIT", "quit"),
             )
         )
         self.previousBoss: Boss | None = None
@@ -451,7 +452,8 @@ class Application:
             window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
             self.windowSize = window.get_size()
             return window
-        return pygame.display.set_mode(self.windowSize, pygame.RESIZABLE)
+        self.windowSize = self.windowedSize
+        return pygame.display.set_mode(self.windowedSize, pygame.RESIZABLE)
 
     def run(self) -> None:
         while self.running:
@@ -495,6 +497,7 @@ class Application:
                 continue
             if event.type == pygame.VIDEORESIZE and not self.settings.fullscreen:
                 self.windowSize = (max(1, event.w), max(1, event.h))
+                self.windowedSize = self.windowSize
                 self.window = pygame.display.set_mode(self.windowSize, pygame.RESIZABLE)
                 if self.game is not None:
                     self.game.window = self.window
@@ -620,7 +623,7 @@ class Application:
         elif self.game is not None:
             self.game.render(present=False)
             if self.scene is Scene.PAUSED:
-                menuUi.drawOverlayMenu(self.canvas, "暂停", self.pauseMenu)
+                menuUi.drawOverlayMenu(self.canvas, "PAUSE", self.pauseMenu)
             elif self.scene is Scene.GAME_OVER:
                 menuUi.drawOverlayMenu(self.canvas, "GAME OVER", self.resultMenu)
             elif self.scene is Scene.STAGE_CLEAR:

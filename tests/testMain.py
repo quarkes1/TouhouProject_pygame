@@ -11,6 +11,7 @@
 """
 
 import random
+from dataclasses import replace
 
 import pygame
 import pytest
@@ -134,6 +135,38 @@ def testResizeEventUpdatesWindowSize(application):
     pygame.event.post(pygame.event.Event(pygame.VIDEORESIZE, size=(900, 700), w=900, h=700))
     application.handleEvents()
     assert application.windowSize == (900, 700)
+    assert application.windowedSize == (900, 700)
+
+
+def testFullscreenRoundTripRestoresWindowedSize(application, monkeypatch):
+    application.windowSize = (900, 700)
+    application.windowedSize = (900, 700)
+    calls = []
+
+    def fakeSetMode(size, flags=0):
+        calls.append((size, flags))
+        return pygame.Surface((1920, 1080) if flags & pygame.FULLSCREEN else size)
+
+    monkeypatch.setattr(pygame.display, "set_mode", fakeSetMode)
+    application.settings = replace(application.settings, fullscreen=True)
+    application._createWindow()
+    application.settings = replace(application.settings, fullscreen=False)
+    application._createWindow()
+
+    assert calls[-1] == ((900, 700), pygame.RESIZABLE)
+
+
+def testShippedMenuLabelsUseGlyphsAvailableInBundledFont(application):
+    menus = (
+        application.titleMenu,
+        application.optionsMenu,
+        application.pauseMenu,
+        application.resultMenu,
+    )
+    labels = tuple(item.label for menu in menus for item in menu.items)
+
+    assert labels
+    assert all(label.isascii() for label in labels)
 
 
 def testLastDeathMovesToGameOver(application):

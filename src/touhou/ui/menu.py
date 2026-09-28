@@ -94,12 +94,12 @@ class OptionsMenu:
         return "settingsChanged", self.settings
 
     def _items(self) -> tuple[MenuItem, ...]:
-        displayMode = "全屏" if self.settings.fullscreen else "窗口"
+        displayMode = "FULLSCREEN" if self.settings.fullscreen else "WINDOW"
         return (
-            MenuItem(f"BGM 音量  {self.settings.bgmVolume}", "bgmVolume"),
-            MenuItem(f"音效音量  {self.settings.soundVolume}", "soundVolume"),
-            MenuItem(f"显示模式  {displayMode}", "fullscreen"),
-            MenuItem("返回", "back"),
+            MenuItem(f"BGM VOLUME  {self.settings.bgmVolume}", "bgmVolume"),
+            MenuItem(f"SE VOLUME  {self.settings.soundVolume}", "soundVolume"),
+            MenuItem(f"DISPLAY  {displayMode}", "fullscreen"),
+            MenuItem("RETURN", "back"),
         )
 
 
