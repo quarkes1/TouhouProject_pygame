@@ -95,6 +95,7 @@ class Game:
         self,
         window: pygame.Surface | None = None,
         canvas: pygame.Surface | None = None,
+        levelPath: Path | None = None,
     ) -> None:
         pygame.init()
 
@@ -195,7 +196,7 @@ class Game:
         # 共用一个列表只会互相干扰。
         self.shots = BulletField()
         self.effects = EffectField()
-        self.level = loadLevel(assetPath(*LEVEL_PATH_PARTS))
+        self.level = loadLevel(levelPath or assetPath(*LEVEL_PATH_PARTS))
         # BOSS 与敌机同一个容器：BOSS 在引擎眼里就是「有血量的、会被打的东西」，
         # 见 entities/boss.py。用关键字传，免得两个元组位置搞反。
         self.enemyField = EnemyField(
