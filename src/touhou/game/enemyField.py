@@ -47,6 +47,15 @@ class EnemyField:
     def __len__(self) -> int:
         return len(self.active)
 
+    def scheduleComplete(self) -> bool:
+        """所有出生计划耗尽且场上已无敌人。"""
+        return (
+            self.spawnCursor >= len(self.spawns)
+            and self.bossCursor >= len(self.bossSpawns)
+            and not self.active
+            and self.boss is None
+        )
+
     def update(self, bulletField: BulletField, playerPosition: Vector2) -> None:
         """推进一帧：推进场上的敌人、打出到点的齐射、回收离场的、再放出新到点的。
 

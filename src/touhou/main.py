@@ -29,7 +29,7 @@ from touhou.game.enemyField import EnemyField
 from touhou.game.entities.boss import Boss
 from touhou.game.entities.bullet import BulletSpec
 from touhou.game.entities.effect import bakeExpandingRing
-from touhou.game.entities.player import Player
+from touhou.game.entities.player import Player, State
 from touhou.game.levelData import loadLevel
 from touhou.ui import bossBar, hud
 from touhou.ui import menu as menuUi
@@ -303,6 +303,13 @@ class Game:
             return
         self.effects.spawn(self.ringFrames, bossBefore.position, self.ringFramesPerFrame)
 
+    def isStageClear(self) -> bool:
+        """时刻表结束且场上已清空时，当前关卡完成。"""
+        return (
+            self.enemyField.elapsedFrames >= self.level.durationFrames
+            and self.enemyField.scheduleComplete()
+        )
+
     def render(self, present: bool = True) -> None:
         self.drawPlayfield()
         # 血条排在游戏区之后（不然会被子弹盖住）、HUD 之前（它只占游戏区那 384px，
@@ -431,6 +438,17 @@ class Application:
                 menuUi.MenuItem("退出", "quit"),
             )
         )
+        self.resultMenu = menuUi.Menu(
+            (
+                menuUi.MenuItem("重新开始", "restart"),
+                menuUi.MenuItem("返回标题", "title"),
+                menuUi.MenuItem("退出", "quit"),
+            )
+        )
+        self.previousBoss: Boss | None = None
+        self.previousPlayerState: State | None = None
+        self.previousShotCount = 0
+        self.previousBombs = 0
 
     def _createWindow(self) -> pygame.Surface:
         if self.settings.fullscreen:
@@ -452,6 +470,10 @@ class Application:
         self.game = Game(self.window, self.canvas)
         self.scene = Scene.PLAYING
         self._resetSessionInput()
+        self.previousBoss = None
+        self.previousPlayerState = self.game.player.state
+        self.previousShotCount = len(self.game.shots)
+        self.previousBombs = self.game.player.bombs
         self.audio.playMusic("stage")
 
     def restartGame(self) -> None:
@@ -499,6 +521,8 @@ class Application:
                 self.game.pressLatch.record()
         elif self.scene is Scene.PAUSED:
             self._handlePauseKey(key)
+        elif self.scene in (Scene.GAME_OVER, Scene.STAGE_CLEAR):
+            self._handleResultKey(key)
 
     def _handleTitleKey(self, key: int) -> None:
         previous = self.titleMenu.selectedIndex
@@ -541,6 +565,17 @@ class Application:
         elif action == "quit":
             self.running = False
 
+    def _handleResultKey(self, key: int) -> None:
+        previous = self.resultMenu.selectedIndex
+        action = self.resultMenu.handleKey(key)
+        self._playMenuFeedback(previous, self.resultMenu.selectedIndex, action)
+        if action == "restart":
+            self.restartGame()
+        elif action == "title" or action == "back":
+            self.returnToTitle()
+        elif action == "quit":
+            self.running = False
+
     def _playMenuFeedback(self, before: int, after: int, action: str | None) -> None:
         if before != after:
             self.audio.playSound("select")
@@ -552,6 +587,34 @@ class Application:
     def update(self) -> None:
         if self.scene is Scene.PLAYING and self.game is not None:
             self.game.update()
+            self._syncGameplayAudio()
+            if self.game.player.state is State.DEAD:
+                self.scene = Scene.GAME_OVER
+                self._resetSessionInput()
+            elif self.game.isStageClear():
+                self.scene = Scene.STAGE_CLEAR
+                self._resetSessionInput()
+
+    def _syncGameplayAudio(self) -> None:
+        if self.game is None:
+            return
+        player = self.game.player
+        if len(self.game.shots) > self.previousShotCount:
+            self.audio.playSound("shot")
+        if player.bombs < self.previousBombs:
+            self.audio.playSound("bomb")
+        if player.state is not self.previousPlayerState:
+            if player.state is State.DYING:
+                self.audio.playSound("damage")
+            elif player.state in (State.RESPAWNING, State.DEAD):
+                self.audio.playSound("death")
+        if self.game.enemyField.boss is not None and self.previousBoss is None:
+            self.audio.playMusic("boss")
+
+        self.previousShotCount = len(self.game.shots)
+        self.previousBombs = player.bombs
+        self.previousPlayerState = player.state
+        self.previousBoss = self.game.enemyField.boss
 
     def render(self) -> None:
         if self.scene is Scene.TITLE:
@@ -562,6 +625,10 @@ class Application:
             self.game.render(present=False)
             if self.scene is Scene.PAUSED:
                 menuUi.drawOverlayMenu(self.canvas, "暂停", self.pauseMenu)
+            elif self.scene is Scene.GAME_OVER:
+                menuUi.drawOverlayMenu(self.canvas, "GAME OVER", self.resultMenu)
+            elif self.scene is Scene.STAGE_CLEAR:
+                menuUi.drawOverlayMenu(self.canvas, "STAGE CLEAR", self.resultMenu)
         presentCanvas(self.window, self.canvas, self.windowSize)
 
     def close(self) -> None:

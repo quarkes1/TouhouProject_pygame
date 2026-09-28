@@ -136,6 +136,87 @@ def testResizeEventUpdatesWindowSize(application):
     assert application.windowSize == (900, 700)
 
 
+def testLastDeathMovesToGameOver(application):
+    application.startGame()
+    assert application.game is not None
+    application.game.player.state = State.DEAD
+
+    application.update()
+
+    assert application.scene is mainModule.Scene.GAME_OVER
+
+
+def testGapBetweenWavesIsNotStageClear(game):
+    game.enemyField.active.clear()
+    game.enemyField.spawnCursor = 0
+    assert not game.isStageClear()
+
+
+def testExhaustedLevelMovesToStageClear(application):
+    application.startGame()
+    assert application.game is not None
+    game = application.game
+    game.enemyField.spawnCursor = len(game.enemyField.spawns)
+    game.enemyField.bossCursor = len(game.enemyField.bossSpawns)
+    game.enemyField.active.clear()
+    game.enemyField.boss = None
+    game.enemyField.elapsedFrames = int(game.level.durationFrames)
+
+    application.update()
+
+    assert application.scene is mainModule.Scene.STAGE_CLEAR
+
+
+@pytest.mark.parametrize("resultScene", [mainModule.Scene.GAME_OVER, mainModule.Scene.STAGE_CLEAR])
+def testResultMenuCanRestartWithAFreshSession(application, resultScene):
+    application.startGame()
+    previous = application.game
+    application.scene = resultScene
+
+    postKeydown(pygame.K_z)
+    application.handleEvents()
+
+    assert application.scene is mainModule.Scene.PLAYING
+    assert application.game is not previous
+
+
+def testResultMenuCanReturnToTitle(application):
+    application.startGame()
+    application.scene = mainModule.Scene.GAME_OVER
+    postKeydown(pygame.K_DOWN)
+    postKeydown(pygame.K_z)
+
+    application.handleEvents()
+
+    assert application.scene is mainModule.Scene.TITLE
+    assert application.game is None
+
+
+def testNewSessionStartsStageMusic(application):
+    application.startGame()
+    assert application.audio.currentMusic == "stage"
+
+
+def testBossArrivalSwitchesToBossMusic(application):
+    application.startGame()
+    assert application.game is not None
+
+    def activeScript(boss):
+        boss.hp = boss.maxHp = 100
+        while True:
+            yield
+
+    boss = Boss(makeBossSpawn(script=activeScript))
+    application.game.enemyField.active.append(boss)
+    application.game.enemyField.boss = boss
+    application.game.player.invincibleFrames = 9999
+
+    application.update()
+    application.update()
+
+    assert application.audio.currentMusic == "boss"
+
+
 def testGameDisablesTextInputForTheWindow(monkeypatch):
     """建窗口时必须关掉 SDL 的文本输入通道，否则中文输入法会截走按键。
 
