@@ -76,7 +76,7 @@ class OptionsMenu:
             return None, self.settings
         if key in (pygame.K_x, pygame.K_ESCAPE):
             return "back", self.settings
-        if self.selectedIndex == 3 and key in (pygame.K_z, pygame.K_RETURN):
+        if self.selectedIndex == 4 and key in (pygame.K_z, pygame.K_RETURN):
             return "back", self.settings
 
         direction = (1 if key == pygame.K_RIGHT else 0) - (1 if key == pygame.K_LEFT else 0)
@@ -88,6 +88,8 @@ class OptionsMenu:
             changed = replace(changed, soundVolume=max(0, min(10, changed.soundVolume + direction)))
         elif self.selectedIndex == 2 and (direction or confirmToggle):
             changed = replace(changed, fullscreen=not changed.fullscreen)
+        elif self.selectedIndex == 3 and (direction or confirmToggle):
+            changed = replace(changed, cheater=not changed.cheater)
 
         if changed == self.settings:
             return None, self.settings
@@ -97,10 +99,12 @@ class OptionsMenu:
 
     def _items(self) -> tuple[MenuItem, ...]:
         displayMode = "FULLSCREEN" if self.settings.fullscreen else "WINDOW"
+        cheaterMode = "ON" if self.settings.cheater else "OFF"
         return (
             MenuItem(f"BGM VOLUME  {self.settings.bgmVolume}", "bgmVolume"),
             MenuItem(f"SE VOLUME  {self.settings.soundVolume}", "soundVolume"),
             MenuItem(f"DISPLAY  {displayMode}", "fullscreen"),
+            MenuItem(f"CHEATER  {cheaterMode}", "cheater"),
             MenuItem("RETURN", "back"),
         )
 

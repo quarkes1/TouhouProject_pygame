@@ -48,7 +48,8 @@ dist/TouhouProject/TouhouProject.exe
 
 ## 设置
 
-设置菜单可分别调整 BGM 和音效音量，并切换窗口/全屏。设置会自动保存：
+设置菜单可分别调整 BGM 和音效音量、切换窗口/全屏，并提供默认关闭的
+`CHEATER` 模式。开启后自机不会受到敌弹或敌机碰撞伤害。设置会自动保存：
 
 - Windows：`%APPDATA%/TouhouProject/settings.json`
 - 其他环境：用户目录下的 `.touhou-project/settings.json`

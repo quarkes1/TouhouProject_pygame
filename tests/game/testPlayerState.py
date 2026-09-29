@@ -277,6 +277,24 @@ def testTouchingAnEnemyKillsThePlayer(player, runPlayer, enemies, makeEnemy, sho
     assert len(shots) == 0, "被撞死的那一帧不该还能开火"
 
 
+def testCheaterIgnoresEnemyBullets(makePlayer, runPlayer, enemyBullets, enemyBulletSpec):
+    cheater = makePlayer(cheater=True)
+    enemyBullets.spawn(enemyBulletSpec, cheater.position, 0, 0)
+
+    runPlayer(cheater, FrameInput())
+
+    assert cheater.state is State.ALIVE
+
+
+def testCheaterIgnoresEnemyContact(makePlayer, runPlayer, enemies, makeEnemy):
+    cheater = makePlayer(cheater=True)
+    enemies.active.append(makeEnemy(position=cheater.position))
+
+    runPlayer(cheater, FrameInput())
+
+    assert cheater.state is State.ALIVE
+
+
 def testEnemyContactIsNotCheckedOutsideTheHitbox(player, runPlayer, enemies, makeEnemy):
     """贴着敌机但没碰到判定点就不算——判定圈不能比看起来还大。"""
     # conftest 的敌机：贴图 24×24 → 机体半径 9.6；数据半径 12。

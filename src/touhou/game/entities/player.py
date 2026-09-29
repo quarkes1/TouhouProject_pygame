@@ -151,6 +151,7 @@ class Player(Collider):
         "bombEffectFrames",
         "bombEffectFramesPerFrame",
         "bombs",
+        "cheater",
         "deathEffectFrames",
         "deathEffectFramesPerFrame",
         "dyingFrames",
@@ -175,6 +176,7 @@ class Player(Collider):
     bombEffectFrames: tuple[pygame.Surface, ...]
     bombEffectFramesPerFrame: int
     bombs: int
+    cheater: bool
     deathEffectFrames: tuple[pygame.Surface, ...]
     deathEffectFramesPerFrame: int
     dyingFrames: int
@@ -204,6 +206,7 @@ class Player(Collider):
         lives: int = constants.START_LIVES,
         bombs: int = constants.START_BOMBS,
         power: float = constants.POWER_START,
+        cheater: bool = False,
     ) -> None:
         super().__init__(constants.PLAYER_HITBOX_RADIUS, position)
         self.spriteSheet = spriteSheet
@@ -230,6 +233,7 @@ class Player(Collider):
         self.lives = lives
         self.bombs = bombs
         self.power = power
+        self.cheater = cheater
         # 复活时从这个位置升起，也就是出生点
         self.respawnPosition = Vector2(position.x, position.y)
 
@@ -256,7 +260,7 @@ class Player(Collider):
 
     def canBeHit(self) -> bool:
         """能不能被弹打中。无敌与 `dying` 期间都不算。"""
-        return self.state is State.ALIVE and not self.isInvincible()
+        return not self.cheater and self.state is State.ALIVE and not self.isInvincible()
 
     def isVisible(self) -> bool:
         """这一帧该不该画出来。

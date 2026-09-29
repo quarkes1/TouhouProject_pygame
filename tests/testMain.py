@@ -125,6 +125,15 @@ def testStartingAndRestartingCreateFreshGameSessions(application):
     assert application.game is not first
 
 
+def testNewGameReceivesCheaterSetting(application):
+    application.settings = replace(application.settings, cheater=True)
+
+    application.startGame()
+
+    assert application.game is not None
+    assert application.game.player.cheater
+
+
 def testEscapePausesAndContinuePreservesSession(application):
     application.startGame()
     session = application.game

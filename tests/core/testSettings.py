@@ -11,7 +11,7 @@ from touhou.core.settings import Settings, loadSettings, saveSettings, settingsP
 
 
 def testDefaultSettingsMatchThePlayableStartingPoint():
-    assert Settings() == Settings(bgmVolume=7, soundVolume=8, fullscreen=False)
+    assert Settings() == Settings(bgmVolume=7, soundVolume=8, fullscreen=False, cheater=False)
 
 
 def testSettingsPathUsesAppDataWhenAvailable(monkeypatch, tmp_path):
@@ -39,7 +39,9 @@ def testMalformedSettingsUseDefaults(tmp_path, content):
 def testMissingFieldsKeepTheirDefaults(tmp_path):
     path = tmp_path / "settings.json"
     path.write_text('{"bgmVolume": 4}', encoding="utf-8")
-    assert loadSettings(path) == Settings(bgmVolume=4, soundVolume=8, fullscreen=False)
+    assert loadSettings(path) == Settings(
+        bgmVolume=4, soundVolume=8, fullscreen=False, cheater=False
+    )
 
 
 def testSettingsAreClampedAndRoundTrip(tmp_path):
@@ -49,7 +51,7 @@ def testSettingsAreClampedAndRoundTrip(tmp_path):
 
     loaded = loadSettings(path)
 
-    assert loaded == Settings(bgmVolume=10, soundVolume=0, fullscreen=True)
+    assert loaded == Settings(bgmVolume=10, soundVolume=0, fullscreen=True, cheater=False)
     saveSettings(loaded, path)
     assert loadSettings(path) == loaded
 
@@ -63,11 +65,12 @@ def testBooleanAndStringVolumesDoNotMasqueradeAsNumbers(tmp_path):
 def testSaveCreatesParentsAndLeavesNoTemporaryFile(tmp_path):
     path = tmp_path / "new" / "settings.json"
 
-    saveSettings(Settings(bgmVolume=2, soundVolume=3, fullscreen=True), path)
+    saveSettings(Settings(bgmVolume=2, soundVolume=3, fullscreen=True, cheater=True), path)
 
     assert json.loads(path.read_text(encoding="utf-8")) == {
         "bgmVolume": 2,
         "soundVolume": 3,
         "fullscreen": True,
+        "cheater": True,
     }
     assert not path.with_suffix(".json.tmp").exists()

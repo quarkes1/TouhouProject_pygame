@@ -74,6 +74,20 @@ def testOptionsToggleFullscreenWithLeftRightOrConfirm():
     assert changed.fullscreen
 
 
+def testOptionsToggleCheaterWithLeftRightOrConfirm():
+    menu = OptionsMenu(Settings(cheater=False))
+    menu.selectedIndex = 3
+
+    action, changed = menu.handleKey(pygame.K_RIGHT)
+    assert action == "settingsChanged"
+    assert changed.cheater
+
+    menu.settings = replace(changed, cheater=False)
+    action, changed = menu.handleKey(pygame.K_z)
+    assert action == "settingsChanged"
+    assert changed.cheater
+
+
 @pytest.mark.parametrize("key", [pygame.K_x, pygame.K_ESCAPE])
 def testOptionsBackKeysReturnWithoutChangingSettings(key):
     settings = Settings(bgmVolume=4, soundVolume=5, fullscreen=True)
@@ -85,7 +99,7 @@ def testOptionsBackKeysReturnWithoutChangingSettings(key):
 
 def testOptionsReturnItemConfirmsBack():
     menu = OptionsMenu(Settings())
-    menu.selectedIndex = 3
+    menu.selectedIndex = 4
     assert menu.handleKey(pygame.K_RETURN)[0] == "back"
 
 

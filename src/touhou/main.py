@@ -99,6 +99,7 @@ class Game:
         window: pygame.Surface | None = None,
         canvas: pygame.Surface | None = None,
         levelPath: Path | None = None,
+        cheater: bool = False,
     ) -> None:
         pygame.init()
 
@@ -185,6 +186,7 @@ class Game:
             # 帧对象**、不是一个「共用开关」：等雷的素材到位，这里换一张烘好的表
             # 就行，`Player` 那边一行不用动。
             bombEffectFrames=self.ringFrames,
+            cheater=cheater,
         )
 
         self.accumulator = FixedStepAccumulator(
@@ -468,7 +470,7 @@ class Application:
             self.render()
 
     def startGame(self) -> None:
-        self.game = Game(self.window, self.canvas)
+        self.game = Game(self.window, self.canvas, cheater=self.settings.cheater)
         self.tutorial = None
         self.scene = Scene.PLAYING
         self._resetSessionInput()
@@ -479,7 +481,12 @@ class Application:
         self.audio.playMusic("stage")
 
     def startTutorial(self) -> None:
-        self.game = Game(self.window, self.canvas, assetPath(*TUTORIAL_LEVEL_PATH_PARTS))
+        self.game = Game(
+            self.window,
+            self.canvas,
+            assetPath(*TUTORIAL_LEVEL_PATH_PARTS),
+            cheater=self.settings.cheater,
+        )
         self.tutorial = TutorialController()
         self.scene = Scene.TUTORIAL
         self._resetSessionInput()

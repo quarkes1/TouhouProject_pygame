@@ -14,6 +14,7 @@ class Settings:
     bgmVolume: int = 7
     soundVolume: int = 8
     fullscreen: bool = False
+    cheater: bool = False
 
 
 def settingsPath() -> Path:
@@ -39,6 +40,7 @@ def loadSettings(path: Path | None = None) -> Settings:
         bgmVolume=_volume(raw.get("bgmVolume"), defaults.bgmVolume),
         soundVolume=_volume(raw.get("soundVolume"), defaults.soundVolume),
         fullscreen=_boolean(raw.get("fullscreen"), defaults.fullscreen),
+        cheater=_boolean(raw.get("cheater"), defaults.cheater),
     )
 
 
@@ -53,6 +55,7 @@ def saveSettings(settings: Settings, path: Path | None = None) -> None:
                 "bgmVolume": settings.bgmVolume,
                 "soundVolume": settings.soundVolume,
                 "fullscreen": settings.fullscreen,
+                "cheater": settings.cheater,
             },
             ensure_ascii=False,
             indent=2,
